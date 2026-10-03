@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script>
+/* ───── 연결 설정: GitHub에 올려 쓸 때 이 한 줄만 고치면 됩니다 ─────
+   Apps Script 웹 앱 주소(https://script.google.com/macros/s/.../exec)를 따옴표 안에 붙여넣으세요.
+   비워 두면 저장되지 않는 미리보기로 열립니다. (Apps Script 안에 Index 로 넣어 쓸 때는 비워 둡니다.) */
+var API_URL = 'https://script.google.com/macros/s/AKfycbymM1nygBXf5hCqlHU2pTbIpaK5Px5DgWuoV6TJcLDexirrw_wgLpTajfESh3XptZcEbQ/exec';
+</script>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>금요일 귀가 조사</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#E6ECF4; --sheet:#FFFFFF; --ink:#15284B; --sub:#5A6A85;
+  --rule:#C6D0DF; --soft:#F1F5FA; --pencil:#E03A2B; --hl:#FFE45C;
+  --head:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --body:"Pretendard",-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none !important}
+:focus-visible{outline:3px solid #3B7DDD;outline-offset:2px}
+
+.wrap{max-width:460px;margin:0 auto;padding:20px 16px 40px}
+body[data-mode="teacher"] .wrap{max-width:820px}
+
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.top h1{font-family:var(--head);font-size:22px;font-weight:400;margin:0;letter-spacing:-.01em}
+.role{font-size:13px;color:var(--sub);border:1px solid var(--rule);border-radius:99px;padding:2px 10px;background:var(--sheet);white-space:nowrap}
+.note{background:var(--hl);border-radius:6px;padding:8px 12px;font-size:14px;margin-bottom:12px}
+
+.sheet{background:var(--sheet);border-top:6px solid var(--ink);border-radius:3px 3px 10px 10px;box-shadow:0 1px 0 var(--rule),0 12px 28px -18px rgba(21,40,75,.45)}
+.part{padding:18px 18px 20px;border-bottom:1px dashed var(--rule)}
+.part:last-child{border-bottom:0}
+.part h2{font-size:15px;font-weight:700;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.part h2 small{font-weight:400;color:var(--sub);font-size:13px}
+.hint{color:var(--sub);font-size:13px;margin:8px 0 0}
+
+/* 날짜 */
+.day{font-family:var(--head);font-size:34px;line-height:1.15;margin:0;letter-spacing:-.02em}
+.day-sub{color:var(--sub);font-size:14px;margin:4px 0 0}
+
+/* 입력 */
+.field{width:100%;border:1.5px solid var(--rule);border-radius:8px;padding:12px 14px;background:#fff;font-size:17px}
+.field:focus{border-color:var(--ink);outline:none;box-shadow:0 0 0 3px rgba(59,125,221,.25)}
+textarea.field{resize:vertical;line-height:1.7;font-size:16px}
+.btn{border:1.5px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;padding:12px 18px;font-weight:700;font-size:16px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{background:#fff;color:var(--ink)}
+.btn.small{padding:7px 12px;font-size:14px;font-weight:600}
+.btn.wide{width:100%}
+.link{background:none;border:0;padding:4px;color:var(--sub);text-decoration:underline;font-size:13px}
+
+/* 이름 고르기 */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{border:1px solid var(--rule);background:#fff;border-radius:6px;padding:6px 10px;font-size:15px;display:inline-flex;align-items:center;gap:4px}
+.chip[aria-pressed="true"]{background:linear-gradient(transparent 12%,var(--hl) 12%,var(--hl) 88%,transparent 88%);border-color:var(--ink);font-weight:700}
+.chip .dot{width:14px;height:14px;display:inline-block}
+
+/* 귀가 방법 */
+.ways{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.way{position:relative;border:1.5px solid var(--rule);background:#fff;border-radius:10px;padding:16px 8px 14px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:700;font-size:17px}
+.way svg.ico{width:44px;height:44px;fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.way .ring{position:absolute;inset:6px;width:calc(100% - 12px);height:calc(100% - 12px);pointer-events:none;opacity:0}
+.way[aria-pressed="true"]{border-color:var(--ink)}
+.way[aria-pressed="true"] .ring{opacity:1}
+
+/* 빨간 색연필 동그라미 */
+.ring path{fill:none;stroke:var(--pencil);stroke-width:2.6;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.mark path{fill:none;stroke:var(--pencil);stroke-width:3.4;stroke-linecap:round}
+.ring.draw path{stroke-dasharray:var(--len,1400px);stroke-dashoffset:var(--len,1400px);animation:draw .45s ease-out forwards}
+.mark.draw path{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .35s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.draw path{animation:none !important;stroke-dasharray:none !important}}
+
+/* 제출 완료 */
+.done{text-align:center;padding:30px 18px 26px}
+.done .big{position:relative;display:inline-block;padding:18px 34px;font-family:var(--head);font-size:30px}
+.done .big .ring{position:absolute;inset:0;width:100%;height:100%}
+.done p{margin:12px 0 0;color:var(--sub)}
+.done .who{color:var(--ink);font-weight:700;font-size:18px;margin-top:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.center{justify-content:center;margin-top:18px}
+.row .grow{flex:1 1 140px;min-width:0}
+
+/* 교사용 */
+.tabs{display:flex;gap:4px;margin-bottom:-1px;padding-left:6px}
+.tab{border:1px solid var(--rule);border-bottom:0;background:#DCE4EF;color:var(--sub);padding:8px 16px;border-radius:8px 8px 0 0;font-weight:600;font-size:15px}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.datenav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-width:0}
+.datenav select{border:1.5px solid var(--rule);border-radius:8px;padding:8px 10px;background:#fff;font-weight:700;min-width:0;flex:1 1 150px;height:38px}
+.datenav .btn{white-space:nowrap}
+.sq{flex:none}
+.sq{width:38px;height:38px;border:1.5px solid var(--rule);background:#fff;border-radius:8px;font-size:18px;line-height:1}
+.status{margin-top:12px;font-size:15px}
+.status b{font-size:18px}
+.status .all{display:inline-block;background:var(--hl);padding:1px 8px;border-radius:4px;font-weight:700;margin-left:6px}
+.status .left{color:var(--sub);font-size:14px;margin-top:2px}
+
+table.form{width:100%;border-collapse:collapse;table-layout:fixed}
+.form th,.form td{border:1px solid var(--rule);text-align:center;padding:0;height:46px}
+.form thead th,.form thead th.c-no,.form thead th.c-date{background:var(--ink);color:#fff;font-weight:600;font-size:14px;border-color:var(--ink);height:40px}
+.form .c-no{width:44px;color:var(--sub);font-size:13px}
+.form .c-name{width:26%;font-weight:700;text-align:left;padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.form .c-date{width:16%;color:var(--sub);font-size:14px}
+.form tr.empty td{background:repeating-linear-gradient(-45deg,#fff,#fff 6px,var(--soft) 6px,var(--soft) 12px)}
+.form tfoot td{background:var(--soft);font-weight:700}
+.cell{width:100%;height:46px;border:0;background:transparent;display:flex;align-items:center;justify-content:center}
+.cell:hover{background:var(--soft)}
+.cell:disabled{cursor:progress;background:transparent}
+.mark{width:30px;height:30px}
+.tablewrap{padding:0 18px 20px}
+
+/* 이름 칸: 누르면 그 자리에서 고친다 */
+.form td.c-name{padding:0}
+.nm{display:block;width:100%;height:46px;border:0;background:transparent;text-align:left;font-weight:700;padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text}
+.nm:hover{background:var(--soft)}
+.nm.add{color:var(--sub);font-weight:400;font-size:14px;cursor:pointer;background:#fff}
+.form td.editing{padding:0 6px;overflow:visible;background:var(--hl)}
+.edit{display:flex;gap:4px;align-items:center}
+.edit input{flex:1;min-width:0;height:34px;border:1.5px solid var(--ink);border-radius:6px;padding:0 8px;font-weight:700;font-size:15px;background:#fff}
+.edit .btn{padding:0 9px;height:34px;font-size:13px;flex:none}
+
+/* 대중교통 명단 */
+.form.sum td{height:auto;padding:12px}
+.sum .c-grade{width:76px;font-weight:700}
+.sum .c-count{width:70px;font-weight:700}
+.form.sum td.c-grade,.form.sum td.c-count{white-space:nowrap;padding-left:4px;padding-right:4px}
+.sum .c-names{text-align:left;line-height:1.8;word-break:keep-all}
+.sum .c-names small{display:block;color:var(--sub);font-size:13px;line-height:1.5}
+.copybox{margin-top:18px}
+.copybox h2{font-size:15px;margin:0 0 8px}
+.copybox textarea.field{min-height:120px;font-size:15px;background:var(--soft);resize:none;overflow:hidden}
+.print-title{display:none}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label.lab{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
+.check{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:15px}
+.check input{width:20px;height:20px;margin-top:2px;accent-color:var(--ink)}
+.qrbox{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.qrbox .grow{flex:1 1 220px;min-width:0}
+.qr{width:150px;height:150px;border:1px solid var(--rule);border-radius:6px;padding:6px;background:#fff;flex:none}
+.qr svg{width:100%;height:100%;display:block}
+.url{width:100%;border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:13px;background:var(--soft);color:var(--ink)}
+
+.overlay{position:fixed;inset:0;background:#fff;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.overlay h2{font-family:var(--head);font-weight:400;font-size:clamp(24px,4.5vw,44px);margin:0}
+.overlay .qr{width:min(64vh,82vw);height:min(64vh,82vw);border:0}
+.overlay p{margin:0;color:var(--sub);word-break:break-all;font-size:14px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;font-size:15px;max-width:calc(100% - 32px);z-index:30;box-shadow:0 8px 24px -8px rgba(21,40,75,.6)}
+.toast.bad{background:var(--pencil)}
+footer{text-align:center;margin-top:16px}
+
+@media (max-width:640px){
+  .grid3{grid-template-columns:1fr}
+  .grid3 textarea.field{min-height:200px}
+}
+@media (max-width:520px){
+  .day{font-size:30px}
+  .grid2{grid-template-columns:1fr}
+  .qrcard{padding:6px 4px 8px;font-size:14px}
+  .qrcard .btn{padding:6px 6px;font-size:13px}
+  .form .c-date{font-size:13px}
+  .nm{padding:0 8px}
+  .form.sum td{padding:10px 8px}
+  .sum .c-grade{width:58px}
+  .sum .c-count{width:54px}
+  .form .c-no{width:34px}
+  .tablewrap{padding:0 10px 16px}
+}
+@media print{
+  body{background:#fff}
+  .top,.tabs,.bar,.seg,.status .left,footer,.note,.toast,#t-settings,.noprint,.copybox{display:none !important}
+  .wrap{max-width:none;padding:0}
+  .sheet{box-shadow:none;border-top:0}
+  .print-title{display:block;font-family:var(--head);font-size:20px;margin:0 0 10px}
+  .form th,.form td{height:30px;border-color:#666}
+  .form thead th,.form thead th.c-no,.form thead th.c-date{background:#fff;color:#000}
+  .cell,.nm{height:30px}.mark{width:22px;height:22px}
+  .nm.add{visibility:hidden}
+  .form.sum td{height:auto;padding:8px 10px}
+  .mark path{stroke:#000}
+  .form .c-date{display:table-cell}
+}
+
+/* 학년 고르기 */
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:8px;overflow:hidden;background:#fff;max-width:100%}
+.seg button{border:0;border-left:1.5px solid var(--ink);background:#fff;padding:8px 18px;font-weight:700;font-size:15px}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.seg button:focus-visible{outline-offset:-4px}
+.seg.wide{display:flex}
+.seg.wide button{flex:1;padding:13px 6px;font-size:17px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid3 textarea.field{min-height:330px;padding:10px 12px}
+.qrs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.qrcard{border:1px solid var(--rule);border-radius:8px;padding:10px 10px 12px;text-align:center;font-weight:700}
+.qrcard .qr{width:100%;max-width:170px;height:auto;aspect-ratio:1;border:0;padding:0;margin:6px auto 8px}
+</style>
+</head>
+<body data-view="__VIEW__" data-url="__APP_URL__" data-grade="__GRADE__">
+<div class="wrap">
+  <header class="top">
+    <h1>금요일 귀가 조사</h1>
+    <span class="role" id="role">학생용</span>
+  </header>
+  <div class="note" id="demo-note" hidden>미리보기 화면입니다. 여기서 누른 내용은 저장되지 않습니다.</div>
+
+  <!-- ───────── 학생용 ───────── -->
+  <main id="v-student" class="sheet" hidden>
+    <div class="part">
+      <p class="day" id="s-day">불러오는 중</p>
+      <p class="day-sub" id="s-daysub"></p>
+    </div>
+    <div id="s-form">
+      <div class="part" id="s-gradepart" hidden>
+        <h2>몇 학년인가요?</h2>
+        <div class="seg wide" id="s-grades" role="group" aria-label="학년"></div>
+      </div>
+      <div id="s-rest" hidden>
+        <div class="part">
+          <h2><label for="s-name">내 이름</label><small id="s-count"></small></h2>
+          <input class="field" id="s-name" type="text" maxlength="20" autocomplete="off" placeholder="이름을 적어 주세요">
+          <div class="chips" id="s-chips" aria-label="등록된 이름"></div>
+          <p class="hint" id="s-hint"></p>
+        </div>
+        <div class="part">
+          <h2>집에 어떻게 가나요?</h2>
+          <div class="ways">
+            <button type="button" class="way" data-way="대중교통" aria-pressed="false">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="3" width="15" height="14.5" rx="2.5"/><path d="M4.5 11.5h15M8 17.5v2.5M16 17.5v2.5M9 6h6"/><circle cx="8.3" cy="14.4" r=".8"/><circle cx="15.7" cy="14.4" r=".8"/></svg>
+              대중교통
+              <svg class="ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M52 4C82 3 97 22 96 50S80 97 49 96 3 78 4 49 20 5 58 6"/></svg>
+            </button>
+            <button type="button" class="way" data-way="부모님차량" aria-pressed="false">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11l1.5-4.1A2.6 2.6 0 0 1 9 5.2h6a2.6 2.6 0 0 1 2.5 1.7L19 11"/><rect x="3" y="11" width="18" height="6.2" rx="2"/><path d="M6.2 17.2v2.3M17.8 17.2v2.3"/><circle cx="7.4" cy="14.1" r=".8"/><circle cx="16.6" cy="14.1" r=".8"/></svg>
+              부모님 차량
+              <svg class="ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M52 4C82 3 97 22 96 50S80 97 49 96 3 78 4 49 20 5 58 6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="part">
+          <button type="button" class="btn wide" id="s-submit">제출하기</button>
+        </div>
+      </div>
+    </div>
+    <div class="done" id="s-done" hidden>
+      <div class="big"><span id="s-done-way"></span>
+        <svg class="ring draw" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M52 4C82 3 97 22 96 50S80 97 49 96 3 78 4 49 20 5 58 6"/></svg>
+      </div>
+      <p class="who" id="s-done-who"></p>
+      <p id="s-done-day"></p>
+      <div class="row center">
+        <button type="button" class="btn ghost" id="s-edit">고치기</button>
+        <button type="button" class="btn ghost" id="s-next">다른 사람 입력</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ───────── 교사용 ───────── -->
+  <main id="v-teacher" hidden>
+    <section class="sheet" id="gate">
+      <div class="part">
+        <h2 id="gate-title">교사 비밀번호</h2>
+        <div class="row">
+          <input class="field grow" id="gate-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="숫자 4~8자리">
+          <button type="button" class="btn" id="gate-go">들어가기</button>
+        </div>
+        <p class="hint" id="gate-hint"></p>
+      </div>
+    </section>
+
+    <div id="t-body" hidden>
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" id="tab-table" aria-selected="true">주간 표</button>
+        <button type="button" class="tab" role="tab" id="tab-sum" aria-selected="false">대중교통 명단</button>
+        <button type="button" class="tab" role="tab" id="tab-settings" aria-selected="false">설정</button>
+      </nav>
+
+      <section class="sheet" id="t-table">
+        <div class="part" style="border-bottom:0">
+          <div class="seg" id="t-grades" role="group" aria-label="학년"></div>
+          <div class="bar" style="margin-top:12px">
+            <div class="datenav">
+              <button type="button" class="sq" id="d-prev" aria-label="지난 금요일">‹</button>
+              <select id="d-select" aria-label="금요일 고르기"></select>
+              <button type="button" class="sq" id="d-next" aria-label="다음 금요일">›</button>
+              <button type="button" class="btn ghost small" id="d-today">이번 주</button>
+            </div>
+            <div class="row">
+              <button type="button" class="btn ghost small" id="t-refresh">새로고침</button>
+              <button type="button" class="btn ghost small" id="t-print">인쇄</button>
+            </div>
+          </div>
+          <div class="status" id="t-status" aria-live="polite"></div>
+        </div>
+        <div class="tablewrap">
+          <p class="print-title" id="t-print-title"></p>
+          <table class="form">
+            <thead><tr><th class="c-no">번호</th><th class="c-name" style="text-align:center">이름</th><th class="c-date">날짜</th><th>대중교통</th><th>부모님 차량</th></tr></thead>
+            <tbody id="t-rows"></tbody>
+            <tfoot><tr><td class="c-no"></td><td class="c-name" style="text-align:center">합계</td><td class="c-date" id="t-sum-all"></td><td id="t-sum-a"></td><td id="t-sum-b"></td></tr></tfoot>
+          </table>
+          <p class="hint noprint">칸을 누르면 동그라미가 찍히고, 다시 누르면 지워집니다. 이름을 누르면 바로 고칠 수 있고, 번호는 가나다순으로 자동으로 매겨집니다.</p>
+        </div>
+      </section>
+
+      <section class="sheet" id="t-sum" hidden>
+        <div class="part" style="border-bottom:0">
+          <div class="bar">
+            <div class="datenav"><select id="m-select" aria-label="금요일 고르기"></select></div>
+            <div class="row">
+              <button type="button" class="btn ghost small" id="m-refresh">새로고침</button>
+              <button type="button" class="btn ghost small" id="m-print">인쇄</button>
+            </div>
+          </div>
+          <div class="status" id="m-status" aria-live="polite"></div>
+        </div>
+        <div class="tablewrap">
+          <p class="print-title" id="m-print-title"></p>
+          <table class="form sum">
+            <thead><tr><th class="c-grade">학년</th><th class="c-count">인원</th><th>대중교통으로 가는 학생</th></tr></thead>
+            <tbody id="m-rows"></tbody>
+            <tfoot><tr><td class="c-grade">합계</td><td class="c-count" id="m-total"></td><td class="c-names" id="m-note"></td></tr></tfoot>
+          </table>
+          <div class="copybox">
+            <h2><label for="m-text">카톡에 붙여넣을 글</label></h2>
+            <textarea class="field" id="m-text" readonly></textarea>
+            <div class="row" style="margin-top:10px"><button type="button" class="btn" id="m-copy">글자로 복사</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sheet" id="t-settings" hidden>
+        <div class="part">
+          <h2>기본 설정</h2>
+          <div class="grid2">
+            <div><label class="lab" for="c-year">연도</label><input class="field" id="c-year" type="number" min="2000" max="2100"></div>
+            <div><label class="lab" for="c-cap">학년당 정원 (명)</label><input class="field" id="c-cap" type="number" min="1" max="60"></div>
+          </div>
+          <p class="hint" id="c-yearhint"></p>
+          <label class="check"><input type="checkbox" id="c-open"><span>학생이 QR로 들어와 자기 이름을 직접 등록할 수 있게 하기<br><small style="color:var(--sub)">명단을 직접 입력했다면 꺼 두는 것을 권합니다.</small></span></label>
+        </div>
+        <div class="part">
+          <h2>학년별 명단</h2>
+          <div class="grid3" id="c-rosters"></div>
+          <p class="hint">한 줄에 한 명씩 붙여넣으세요. 저장하면 가나다순으로 정리되고 번호가 자동으로 매겨집니다.</p>
+          <div class="row" style="margin-top:12px"><button type="button" class="btn" id="c-save">설정 저장</button></div>
+        </div>
+        <div class="part">
+          <h2>학생용 QR</h2>
+          <div class="qrs" id="qr-cards"></div>
+          <div class="grid2">
+            <div><label class="lab" for="u-teacher">교사용 주소 (다른 선생님께 비밀번호와 함께 알려 주세요)</label><input class="url" id="u-teacher" readonly></div>
+            <div><label class="lab" for="u-student">학년을 고르는 학생용 공통 주소</label><input class="url" id="u-student" readonly></div>
+          </div>
+          <p class="hint" id="qr-hint" hidden>배포하면 실제 주소와 QR로 바뀝니다.</p>
+          <div class="row" style="margin-top:12px">
+            <a class="btn ghost small" id="sheet-link" target="_blank" rel="noopener" style="text-decoration:none" hidden>구글 시트 열기</a>
+          </div>
+        </div>
+        <div class="part">
+          <h2>비밀번호 바꾸기</h2>
+          <div class="row">
+            <input class="field grow" id="p-new" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="새 비밀번호 (숫자 4~8자리)">
+            <button type="button" class="btn ghost" id="p-save">바꾸기</button>
+          </div>
+          <p class="hint">비밀번호를 아는 교사는 모든 학년의 표와 설정을 볼 수 있습니다.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer><button type="button" class="link" id="switch">교사용 화면</button></footer>
+</div>
+
+<div class="overlay" id="qr-overlay" hidden>
+  <h2 id="qr-title">휴대폰 카메라로 찍어 주세요</h2>
+  <div class="qr" id="qr-large"></div>
+  <p id="qr-url"></p>
+  <button type="button" class="btn ghost" id="qr-close">닫기</button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>/* QR Code Generator for JavaScript, (c) 2009 Kazuhiko Arase, MIT license. "QR Code" is a registered trademark of DENSO WAVE INCORPORATED. */
+var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],f={},c=function(t,r){o=function(t){for(var r=new Array(t),e=0;e<t;e+=1){r[e]=new Array(t);for(var n=0;n<t;n+=1)r[e][n]=null}return r}(i=4*e+17),l(0,0),l(i-7,0),l(0,i-7),s(),h(),d(t,r),e>=7&&v(t),null==a&&(a=p(e,n,u)),w(a,r)},l=function(t,r){for(var e=-1;e<=7;e+=1)if(!(t+e<=-1||i<=t+e))for(var n=-1;n<=7;n+=1)r+n<=-1||i<=r+n||(o[t+e][r+n]=0<=e&&e<=6&&(0==n||6==n)||0<=n&&n<=6&&(0==e||6==e)||2<=e&&e<=4&&2<=n&&n<=4)},h=function(){for(var t=8;t<i-8;t+=1)null==o[t][6]&&(o[t][6]=t%2==0);for(var r=8;r<i-8;r+=1)null==o[6][r]&&(o[6][r]=r%2==0)},s=function(){for(var t=B.getPatternPosition(e),r=0;r<t.length;r+=1)for(var n=0;n<t.length;n+=1){var i=t[r],a=t[n];if(null==o[i][a])for(var u=-2;u<=2;u+=1)for(var f=-2;f<=2;f+=1)o[i+u][a+f]=-2==u||2==u||-2==f||2==f||0==u&&0==f}},v=function(t){for(var r=B.getBCHTypeNumber(e),n=0;n<18;n+=1){var a=!t&&1==(r>>n&1);o[Math.floor(n/3)][n%3+i-8-3]=a}for(n=0;n<18;n+=1){a=!t&&1==(r>>n&1);o[n%3+i-8-3][Math.floor(n/3)]=a}},d=function(t,r){for(var e=n<<3|r,a=B.getBCHTypeInfo(e),u=0;u<15;u+=1){var f=!t&&1==(a>>u&1);u<6?o[u][8]=f:u<8?o[u+1][8]=f:o[i-15+u][8]=f}for(u=0;u<15;u+=1){f=!t&&1==(a>>u&1);u<8?o[8][i-u-1]=f:u<9?o[8][15-u-1+1]=f:o[8][15-u-1]=f}o[i-8][8]=!t},w=function(t,r){for(var e=-1,n=i-1,a=7,u=0,f=B.getMaskFunction(r),c=i-1;c>0;c-=2)for(6==c&&(c-=1);;){for(var g=0;g<2;g+=1)if(null==o[n][c-g]){var l=!1;u<t.length&&(l=1==(t[u]>>>a&1)),f(n,c-g)&&(l=!l),o[n][c-g]=l,-1==(a-=1)&&(u+=1,a=7)}if((n+=e)<0||i<=n){n-=e,e=-e;break}}},p=function(t,r,e){for(var n=A.getRSBlocks(t,r),o=b(),i=0;i<e.length;i+=1){var a=e[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var u=0;for(i=0;i<n.length;i+=1)u+=n[i].dataCount;if(o.getLengthInBits()>8*u)throw"code length overflow. ("+o.getLengthInBits()+">"+8*u+")";for(o.getLengthInBits()+4<=8*u&&o.put(0,4);o.getLengthInBits()%8!=0;)o.putBit(!1);for(;!(o.getLengthInBits()>=8*u||(o.put(236,8),o.getLengthInBits()>=8*u));)o.put(17,8);return function(t,r){for(var e=0,n=0,o=0,i=new Array(r.length),a=new Array(r.length),u=0;u<r.length;u+=1){var f=r[u].dataCount,c=r[u].totalCount-f;n=Math.max(n,f),o=Math.max(o,c),i[u]=new Array(f);for(var g=0;g<i[u].length;g+=1)i[u][g]=255&t.getBuffer()[g+e];e+=f;var l=B.getErrorCorrectPolynomial(c),h=k(i[u],l.getLength()-1).mod(l);for(a[u]=new Array(l.getLength()-1),g=0;g<a[u].length;g+=1){var s=g+h.getLength()-a[u].length;a[u][g]=s>=0?h.getAt(s):0}}var v=0;for(g=0;g<r.length;g+=1)v+=r[g].totalCount;var d=new Array(v),w=0;for(g=0;g<n;g+=1)for(u=0;u<r.length;u+=1)g<i[u].length&&(d[w]=i[u][g],w+=1);for(g=0;g<o;g+=1)for(u=0;u<r.length;u+=1)g<a[u].length&&(d[w]=a[u][g],w+=1);return d}(o,n)};f.addData=function(t,r){var e=null;switch(r=r||"Byte"){case"Numeric":e=M(t);break;case"Alphanumeric":e=x(t);break;case"Byte":e=m(t);break;case"Kanji":e=L(t);break;default:throw"mode:"+r}u.push(e),a=null},f.isDark=function(t,r){if(t<0||i<=t||r<0||i<=r)throw t+","+r;return o[t][r]},f.getModuleCount=function(){return i},f.make=function(){if(e<1){for(var t=1;t<40;t++){for(var r=A.getRSBlocks(t,n),o=b(),i=0;i<u.length;i++){var a=u[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var g=0;for(i=0;i<r.length;i++)g+=r[i].dataCount;if(o.getLengthInBits()<=8*g)break}e=t}c(!1,function(){for(var t=0,r=0,e=0;e<8;e+=1){c(!0,e);var n=B.getLostPoint(f);(0==e||t>n)&&(t=n,r=e)}return r}())},f.createTableTag=function(t,r){t=t||2;var e="";e+='<table style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: "+(r=void 0===r?4*t:r)+"px;",e+='">',e+="<tbody>";for(var n=0;n<f.getModuleCount();n+=1){e+="<tr>";for(var o=0;o<f.getModuleCount();o+=1)e+='<td style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: 0px;",e+=" width: "+t+"px;",e+=" height: "+t+"px;",e+=" background-color: ",e+=f.isDark(n,o)?"#000000":"#ffffff",e+=";",e+='"/>';e+="</tr>"}return e+="</tbody>",e+="</table>"},f.createSvgTag=function(t,r,e,n){var o={};"object"==typeof arguments[0]&&(t=(o=arguments[0]).cellSize,r=o.margin,e=o.alt,n=o.title),t=t||2,r=void 0===r?4*t:r,(e="string"==typeof e?{text:e}:e||{}).text=e.text||null,e.id=e.text?e.id||"qrcode-description":null,(n="string"==typeof n?{text:n}:n||{}).text=n.text||null,n.id=n.text?n.id||"qrcode-title":null;var i,a,u,c,g=f.getModuleCount()*t+2*r,l="";for(c="l"+t+",0 0,"+t+" -"+t+",0 0,-"+t+"z ",l+='<svg version="1.1" xmlns="http://www.w3.org/2000/svg"',l+=o.scalable?"":' width="'+g+'px" height="'+g+'px"',l+=' viewBox="0 0 '+g+" "+g+'" ',l+=' preserveAspectRatio="xMinYMin meet"',l+=n.text||e.text?' role="img" aria-labelledby="'+y([n.id,e.id].join(" ").trim())+'"':"",l+=">",l+=n.text?'<title id="'+y(n.id)+'">'+y(n.text)+"</title>":"",l+=e.text?'<description id="'+y(e.id)+'">'+y(e.text)+"</description>":"",l+='<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>',l+='<path d="',a=0;a<f.getModuleCount();a+=1)for(u=a*t+r,i=0;i<f.getModuleCount();i+=1)f.isDark(a,i)&&(l+="M"+(i*t+r)+","+u+c);return l+='" stroke="transparent" fill="black"/>',l+="</svg>"},f.createDataURL=function(t,r){t=t||2,r=void 0===r?4*t:r;var e=f.getModuleCount()*t+2*r,n=r,o=e-r;return I(e,e,function(r,e){if(n<=r&&r<o&&n<=e&&e<o){var i=Math.floor((r-n)/t),a=Math.floor((e-n)/t);return f.isDark(a,i)?0:1}return 1})},f.createImgTag=function(t,r,e){t=t||2,r=void 0===r?4*t:r;var n=f.getModuleCount()*t+2*r,o="";return o+="<img",o+=' src="',o+=f.createDataURL(t,r),o+='"',o+=' width="',o+=n,o+='"',o+=' height="',o+=n,o+='"',e&&(o+=' alt="',o+=y(e),o+='"'),o+="/>"};var y=function(t){for(var r="",e=0;e<t.length;e+=1){var n=t.charAt(e);switch(n){case"<":r+="&lt;";break;case">":r+="&gt;";break;case"&":r+="&amp;";break;case'"':r+="&quot;";break;default:r+=n}}return r};return f.createASCII=function(t,r){if((t=t||1)<2)return function(t){t=void 0===t?2:t;var r,e,n,o,i,a=1*f.getModuleCount()+2*t,u=t,c=a-t,g={"██":"█","█ ":"▀"," █":"▄","  ":" "},l={"██":"▀","█ ":"▀"," █":" ","  ":" "},h="";for(r=0;r<a;r+=2){for(n=Math.floor((r-u)/1),o=Math.floor((r+1-u)/1),e=0;e<a;e+=1)i="█",u<=e&&e<c&&u<=r&&r<c&&f.isDark(n,Math.floor((e-u)/1))&&(i=" "),u<=e&&e<c&&u<=r+1&&r+1<c&&f.isDark(o,Math.floor((e-u)/1))?i+=" ":i+="█",h+=t<1&&r+1>=c?l[i]:g[i];h+="\n"}return a%2&&t>0?h.substring(0,h.length-a-1)+Array(a+1).join("▀"):h.substring(0,h.length-1)}(r);t-=1,r=void 0===r?2*t:r;var e,n,o,i,a=f.getModuleCount()*t+2*r,u=r,c=a-r,g=Array(t+1).join("██"),l=Array(t+1).join("  "),h="",s="";for(e=0;e<a;e+=1){for(o=Math.floor((e-u)/t),s="",n=0;n<a;n+=1)i=1,u<=n&&n<c&&u<=e&&e<c&&f.isDark(o,Math.floor((n-u)/t))&&(i=0),s+=i?g:l;for(o=0;o<t;o+=1)h+=s+"\n"}return h.substring(0,h.length-1)},f.renderTo2dContext=function(t,r){r=r||2;for(var e=f.getModuleCount(),n=0;n<e;n++)for(var o=0;o<e;o++)t.fillStyle=f.isDark(n,o)?"black":"white",t.fillRect(o*r,n*r,r,r)},f};t.stringToBytes=(t.stringToBytesFuncs={default:function(t){for(var r=[],e=0;e<t.length;e+=1){var n=t.charCodeAt(e);r.push(255&n)}return r}}).default,t.createStringToBytes=function(t,r){var e=function(){for(var e=S(t),n=function(){var t=e.read();if(-1==t)throw"eof";return t},o=0,i={};;){var a=e.read();if(-1==a)break;var u=n(),f=n()<<8|n();i[String.fromCharCode(a<<8|u)]=f,o+=1}if(o!=r)throw o+" != "+r;return i}(),n="?".charCodeAt(0);return function(t){for(var r=[],o=0;o<t.length;o+=1){var i=t.charCodeAt(o);if(i<128)r.push(i);else{var a=e[t.charAt(o)];"number"==typeof a?(255&a)==a?r.push(a):(r.push(a>>>8),r.push(255&a)):r.push(n)}}return r}};var r,e,n,o,i,a=1,u=2,f=4,c=8,g={L:1,M:0,Q:3,H:2},l=0,h=1,s=2,v=3,d=4,w=5,p=6,y=7,B=(r=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],e=1335,n=7973,i=function(t){for(var r=0;0!=t;)r+=1,t>>>=1;return r},(o={}).getBCHTypeInfo=function(t){for(var r=t<<10;i(r)-i(e)>=0;)r^=e<<i(r)-i(e);return 21522^(t<<10|r)},o.getBCHTypeNumber=function(t){for(var r=t<<12;i(r)-i(n)>=0;)r^=n<<i(r)-i(n);return t<<12|r},o.getPatternPosition=function(t){return r[t-1]},o.getMaskFunction=function(t){switch(t){case l:return function(t,r){return(t+r)%2==0};case h:return function(t,r){return t%2==0};case s:return function(t,r){return r%3==0};case v:return function(t,r){return(t+r)%3==0};case d:return function(t,r){return(Math.floor(t/2)+Math.floor(r/3))%2==0};case w:return function(t,r){return t*r%2+t*r%3==0};case p:return function(t,r){return(t*r%2+t*r%3)%2==0};case y:return function(t,r){return(t*r%3+(t+r)%2)%2==0};default:throw"bad maskPattern:"+t}},o.getErrorCorrectPolynomial=function(t){for(var r=k([1],0),e=0;e<t;e+=1)r=r.multiply(k([1,C.gexp(e)],0));return r},o.getLengthInBits=function(t,r){if(1<=r&&r<10)switch(t){case a:return 10;case u:return 9;case f:case c:return 8;default:throw"mode:"+t}else if(r<27)switch(t){case a:return 12;case u:return 11;case f:return 16;case c:return 10;default:throw"mode:"+t}else{if(!(r<41))throw"type:"+r;switch(t){case a:return 14;case u:return 13;case f:return 16;case c:return 12;default:throw"mode:"+t}}},o.getLostPoint=function(t){for(var r=t.getModuleCount(),e=0,n=0;n<r;n+=1)for(var o=0;o<r;o+=1){for(var i=0,a=t.isDark(n,o),u=-1;u<=1;u+=1)if(!(n+u<0||r<=n+u))for(var f=-1;f<=1;f+=1)o+f<0||r<=o+f||0==u&&0==f||a==t.isDark(n+u,o+f)&&(i+=1);i>5&&(e+=3+i-5)}for(n=0;n<r-1;n+=1)for(o=0;o<r-1;o+=1){var c=0;t.isDark(n,o)&&(c+=1),t.isDark(n+1,o)&&(c+=1),t.isDark(n,o+1)&&(c+=1),t.isDark(n+1,o+1)&&(c+=1),0!=c&&4!=c||(e+=3)}for(n=0;n<r;n+=1)for(o=0;o<r-6;o+=1)t.isDark(n,o)&&!t.isDark(n,o+1)&&t.isDark(n,o+2)&&t.isDark(n,o+3)&&t.isDark(n,o+4)&&!t.isDark(n,o+5)&&t.isDark(n,o+6)&&(e+=40);for(o=0;o<r;o+=1)for(n=0;n<r-6;n+=1)t.isDark(n,o)&&!t.isDark(n+1,o)&&t.isDark(n+2,o)&&t.isDark(n+3,o)&&t.isDark(n+4,o)&&!t.isDark(n+5,o)&&t.isDark(n+6,o)&&(e+=40);var g=0;for(o=0;o<r;o+=1)for(n=0;n<r;n+=1)t.isDark(n,o)&&(g+=1);return e+=Math.abs(100*g/r/r-50)/5*10},o),C=function(){for(var t=new Array(256),r=new Array(256),e=0;e<8;e+=1)t[e]=1<<e;for(e=8;e<256;e+=1)t[e]=t[e-4]^t[e-5]^t[e-6]^t[e-8];for(e=0;e<255;e+=1)r[t[e]]=e;var n={glog:function(t){if(t<1)throw"glog("+t+")";return r[t]},gexp:function(r){for(;r<0;)r+=255;for(;r>=256;)r-=255;return t[r]}};return n}();function k(t,r){if(void 0===t.length)throw t.length+"/"+r;var e=function(){for(var e=0;e<t.length&&0==t[e];)e+=1;for(var n=new Array(t.length-e+r),o=0;o<t.length-e;o+=1)n[o]=t[o+e];return n}(),n={getAt:function(t){return e[t]},getLength:function(){return e.length},multiply:function(t){for(var r=new Array(n.getLength()+t.getLength()-1),e=0;e<n.getLength();e+=1)for(var o=0;o<t.getLength();o+=1)r[e+o]^=C.gexp(C.glog(n.getAt(e))+C.glog(t.getAt(o)));return k(r,0)},mod:function(t){if(n.getLength()-t.getLength()<0)return n;for(var r=C.glog(n.getAt(0))-C.glog(t.getAt(0)),e=new Array(n.getLength()),o=0;o<n.getLength();o+=1)e[o]=n.getAt(o);for(o=0;o<t.getLength();o+=1)e[o]^=C.gexp(C.glog(t.getAt(o))+r);return k(e,0).mod(t)}};return n}var A=function(){var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r=function(t,r){var e={};return e.totalCount=t,e.dataCount=r,e},e={};return e.getRSBlocks=function(e,n){var o=function(r,e){switch(e){case g.L:return t[4*(r-1)+0];case g.M:return t[4*(r-1)+1];case g.Q:return t[4*(r-1)+2];case g.H:return t[4*(r-1)+3];default:return}}(e,n);if(void 0===o)throw"bad rs block @ typeNumber:"+e+"/errorCorrectionLevel:"+n;for(var i=o.length/3,a=[],u=0;u<i;u+=1)for(var f=o[3*u+0],c=o[3*u+1],l=o[3*u+2],h=0;h<f;h+=1)a.push(r(c,l));return a},e}(),b=function(){var t=[],r=0,e={getBuffer:function(){return t},getAt:function(r){var e=Math.floor(r/8);return 1==(t[e]>>>7-r%8&1)},put:function(t,r){for(var n=0;n<r;n+=1)e.putBit(1==(t>>>r-n-1&1))},getLengthInBits:function(){return r},putBit:function(e){var n=Math.floor(r/8);t.length<=n&&t.push(0),e&&(t[n]|=128>>>r%8),r+=1}};return e},M=function(t){var r=a,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+2<r.length;)t.put(o(r.substring(n,n+3)),10),n+=3;n<r.length&&(r.length-n==1?t.put(o(r.substring(n,n+1)),4):r.length-n==2&&t.put(o(r.substring(n,n+2)),7))}},o=function(t){for(var r=0,e=0;e<t.length;e+=1)r=10*r+i(t.charAt(e));return r},i=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);throw"illegal char :"+t};return n},x=function(t){var r=u,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+1<r.length;)t.put(45*o(r.charAt(n))+o(r.charAt(n+1)),11),n+=2;n<r.length&&t.put(o(r.charAt(n)),6)}},o=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);if("A"<=t&&t<="Z")return t.charCodeAt(0)-"A".charCodeAt(0)+10;switch(t){case" ":return 36;case"$":return 37;case"%":return 38;case"*":return 39;case"+":return 40;case"-":return 41;case".":return 42;case"/":return 43;case":":return 44;default:throw"illegal char :"+t}};return n},m=function(r){var e=f,n=t.stringToBytes(r),o={getMode:function(){return e},getLength:function(t){return n.length},write:function(t){for(var r=0;r<n.length;r+=1)t.put(n[r],8)}};return o},L=function(r){var e=c,n=t.stringToBytesFuncs.SJIS;if(!n)throw"sjis not supported.";!function(){var t=n("友");if(2!=t.length||38726!=(t[0]<<8|t[1]))throw"sjis not supported."}();var o=n(r),i={getMode:function(){return e},getLength:function(t){return~~(o.length/2)},write:function(t){for(var r=o,e=0;e+1<r.length;){var n=(255&r[e])<<8|255&r[e+1];if(33088<=n&&n<=40956)n-=33088;else{if(!(57408<=n&&n<=60351))throw"illegal char at "+(e+1)+"/"+n;n-=49472}n=192*(n>>>8&255)+(255&n),t.put(n,13),e+=2}if(e<r.length)throw"illegal char at "+(e+1)}};return i},D=function(){var t=[],r={writeByte:function(r){t.push(255&r)},writeShort:function(t){r.writeByte(t),r.writeByte(t>>>8)},writeBytes:function(t,e,n){e=e||0,n=n||t.length;for(var o=0;o<n;o+=1)r.writeByte(t[o+e])},writeString:function(t){for(var e=0;e<t.length;e+=1)r.writeByte(t.charCodeAt(e))},toByteArray:function(){return t},toString:function(){var r="";r+="[";for(var e=0;e<t.length;e+=1)e>0&&(r+=","),r+=t[e];return r+="]"}};return r},S=function(t){var r=t,e=0,n=0,o=0,i={read:function(){for(;o<8;){if(e>=r.length){if(0==o)return-1;throw"unexpected end of file./"+o}var t=r.charAt(e);if(e+=1,"="==t)return o=0,-1;t.match(/^\s$/)||(n=n<<6|a(t.charCodeAt(0)),o+=6)}var i=n>>>o-8&255;return o-=8,i}},a=function(t){if(65<=t&&t<=90)return t-65;if(97<=t&&t<=122)return t-97+26;if(48<=t&&t<=57)return t-48+52;if(43==t)return 62;if(47==t)return 63;throw"c:"+t};return i},I=function(t,r,e){for(var n=function(t,r){var e=t,n=r,o=new Array(t*r),i={setPixel:function(t,r,n){o[r*e+t]=n},write:function(t){t.writeString("GIF87a"),t.writeShort(e),t.writeShort(n),t.writeByte(128),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(255),t.writeByte(255),t.writeByte(255),t.writeString(","),t.writeShort(0),t.writeShort(0),t.writeShort(e),t.writeShort(n),t.writeByte(0);var r=a(2);t.writeByte(2);for(var o=0;r.length-o>255;)t.writeByte(255),t.writeBytes(r,o,255),o+=255;t.writeByte(r.length-o),t.writeBytes(r,o,r.length-o),t.writeByte(0),t.writeString(";")}},a=function(t){for(var r=1<<t,e=1+(1<<t),n=t+1,i=u(),a=0;a<r;a+=1)i.add(String.fromCharCode(a));i.add(String.fromCharCode(r)),i.add(String.fromCharCode(e));var f,c,g,l=D(),h=(f=l,c=0,g=0,{write:function(t,r){if(t>>>r!=0)throw"length over";for(;c+r>=8;)f.writeByte(255&(t<<c|g)),r-=8-c,t>>>=8-c,g=0,c=0;g|=t<<c,c+=r},flush:function(){c>0&&f.writeByte(g)}});h.write(r,n);var s=0,v=String.fromCharCode(o[s]);for(s+=1;s<o.length;){var d=String.fromCharCode(o[s]);s+=1,i.contains(v+d)?v+=d:(h.write(i.indexOf(v),n),i.size()<4095&&(i.size()==1<<n&&(n+=1),i.add(v+d)),v=d)}return h.write(i.indexOf(v),n),h.write(e,n),h.flush(),l.toByteArray()},u=function(){var t={},r=0,e={add:function(n){if(e.contains(n))throw"dup key:"+n;t[n]=r,r+=1},size:function(){return r},indexOf:function(r){return t[r]},contains:function(r){return void 0!==t[r]}};return e};return i}(t,r),o=0;o<r;o+=1)for(var i=0;i<t;i+=1)n.setPixel(i,o,e(i,o));var a=D();n.write(a);for(var u=function(){var t=0,r=0,e=0,n="",o={},i=function(t){n+=String.fromCharCode(a(63&t))},a=function(t){if(t<0);else{if(t<26)return 65+t;if(t<52)return t-26+97;if(t<62)return t-52+48;if(62==t)return 43;if(63==t)return 47}throw"n:"+t};return o.writeByte=function(n){for(t=t<<8|255&n,r+=8,e+=1;r>=6;)i(t>>>r-6),r-=6},o.flush=function(){if(r>0&&(i(t<<6-r),t=0,r=0),e%3!=0)for(var o=3-e%3,a=0;a<o;a+=1)n+="="},o.toString=function(){return n},o}(),f=a.toByteArray(),c=0;c<f.length;c+=1)u.writeByte(f[c]);return u.flush(),"data:image/gif;base64,"+u};return t}();qrcode.stringToBytesFuncs["UTF-8"]=function(t){return function(t){for(var r=[],e=0;e<t.length;e++){var n=t.charCodeAt(e);n<128?r.push(n):n<2048?r.push(192|n>>6,128|63&n):n<55296||n>=57344?r.push(224|n>>12,128|n>>6&63,128|63&n):(e++,n=65536+((1023&n)<<10|1023&t.charCodeAt(e)),r.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return r}(t)},function(t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports&&(module.exports=t())}(function(){return qrcode});</script>
+<script>
+(function () {
+  'use strict';
+
+  /* ───────── 날짜 계산 ───────── */
+  var WAYS = ['대중교통', '부모님차량'];
+  var WAY_LABEL = { '대중교통': '대중교통', '부모님차량': '부모님 차량' };
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function keyOf(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function partsOf(key) { var p = key.split('-'); return { y: +p[0], m: +p[1], d: +p[2] }; }
+
+  /** 그 해의 모든 금요일 */
+  function fridaysOf(year) {
+    var d = new Date(year, 0, 1);
+    d.setDate(1 + ((5 - d.getDay() + 7) % 7));
+    var out = [];
+    while (d.getFullYear() === year) { out.push(keyOf(d)); d.setDate(d.getDate() + 7); }
+    return out;
+  }
+  /** 오늘이 속한 주의 금요일. 토, 일요일에는 다음 주 금요일. */
+  function thisFriday(today) {
+    var d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7));
+    return keyOf(d);
+  }
+  /** 설정 연도 안에서 이번 주 금요일. 연도를 벗어나면 그 해의 첫, 마지막 금요일. */
+  function defaultFriday(year, today) {
+    var f = thisFriday(today), list = fridaysOf(year);
+    if (list.indexOf(f) >= 0) return f;
+    return f < list[0] ? list[0] : list[list.length - 1];
+  }
+  function fmtLong(key) { var p = partsOf(key); return p.m + '월 ' + p.d + '일 금요일'; }
+  function fmtShort(key) { var p = partsOf(key); return p.m + '/' + p.d; }
+
+  /* ───────── 서버 호출 (구글 밖에서 열면 미리보기용 가짜 서버) ───────── */
+  var GR = ['1학년', '2학년', '3학년'];
+  function byName(a, b) { return a < b ? -1 : a > b ? 1 : 0; }   // 한글은 글자 코드 순서가 가나다순
+  var GAS = typeof google !== 'undefined' && google.script && google.script.run;      // Apps Script 안에서 열림
+  var API = String(window.API_URL || '').trim();                                       // GitHub 등 다른 곳에서 열림
+  var API_OK = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+|macros)\/s\/[\w-]+\/exec$/.test(API);
+  var LIVE = !!GAS || API_OK;
+  var demo = (function () {
+    var D = {
+      year: new Date().getFullYear(), capacity: 20, open: true, pin: '', resp: {},
+      rosters: {
+        '1학년': ['김하늘', '이서준', '박지우', '최민서', '정예준', '강서연', '조도윤', '윤하은', '장시우', '임지호', '한수아', '오주원', '서은우', '신채원', '권유준', '황다은', '안현우', '송지안'],
+        '2학년': ['고은별', '남궁민', '도하린', '류시안', '문가온', '민서율', '배준희', '백도현', '변하람', '성지유', '손예린', '엄태윤', '여민재', '유나경', '육서진', '인하준', '전소율', '차은호', '표지후', '함다온'],
+        '3학년': ['구본우', '나윤서', '노아인', '마루한', '맹서하', '방지율', '봉태이', '석민규', '선우진', '소하윤', '심재이', '양도경', '연시현', '염하진', '왕지호', '우서아', '원태경', '진솔', '하유빈']
+      }
+    };
+    var f = thisFriday(new Date());
+    GR.forEach(function (g, gi) {
+      D.rosters[g].sort(byName);
+      var r = D.resp[f + '|' + g] = {};
+      D.rosters[g].slice(0, 11 - gi * 3).forEach(function (n, i) { r[n] = WAYS[i % 3 === 1 ? 1 : 0]; });
+    });
+    function st(dk, g) {
+      var r = {}, src = D.resp[dk + '|' + g] || {}, ro = {};
+      Object.keys(src).forEach(function (k) { r[k] = src[k]; });
+      GR.forEach(function (x) { ro[x] = D.rosters[x].slice(); });
+      return { year: D.year, capacity: D.capacity, open: D.open, grades: GR.slice(), rosters: ro, responses: r, date: dk || '', grade: GR.indexOf(g) >= 0 ? g : '', hasPin: !!D.pin };
+    }
+    function chk(p) { if (!D.pin) throw new Error('교사 비밀번호를 먼저 만들어 주세요.'); if (String(p) !== D.pin) throw new Error('비밀번호가 맞지 않습니다.'); }
+    function bucket(dk, g) { return D.resp[dk + '|' + g] = D.resp[dk + '|' + g] || {}; }
+    return {
+      getState: st,
+      registerName: function (g, n, dk) {
+        if (D.rosters[g].indexOf(n) < 0) {
+          if (!D.open) throw new Error('지금은 이름 등록을 받지 않습니다. 선생님께 말씀드리세요.');
+          if (D.rosters[g].length >= D.capacity) throw new Error(g + ' 정원 ' + D.capacity + '명이 모두 등록되었습니다. 선생님께 말씀드리세요.');
+          D.rosters[g].push(n); D.rosters[g].sort(byName);
+        }
+        return st(dk, g);
+      },
+      submitResponse: function (dk, g, n, m) { bucket(dk, g)[n] = m; return st(dk, g); },
+      checkPin: function (p) { chk(p); return { sheetUrl: '' }; },
+      setPin: function (o, n) {
+        if (D.pin) chk(o);
+        if (!/^\d{4,8}$/.test(String(n))) throw new Error('비밀번호는 숫자 4~8자리로 정해 주세요.');
+        D.pin = String(n); return true;
+      },
+      teacherMark: function (p, dk, g, n, m) { chk(p); if (m) bucket(dk, g)[n] = m; else delete bucket(dk, g)[n]; return st(dk, g); },
+      renameStudent: function (p, g, old, nw, dk) {
+        chk(p);
+        var at = D.rosters[g].indexOf(old);
+        if (at < 0) throw new Error(g + ' 명단에 없는 이름입니다.');
+        if (nw !== old) {
+          if (D.rosters[g].indexOf(nw) >= 0) throw new Error(g + '에 이미 같은 이름이 있습니다.');
+          D.rosters[g][at] = nw; D.rosters[g].sort(byName);
+          Object.keys(D.resp).forEach(function (k) {
+            if (k.split('|')[1] === g && D.resp[k][old]) { D.resp[k][nw] = D.resp[k][old]; delete D.resp[k][old]; }
+          });
+        }
+        return st(dk, g);
+      },
+      addStudent: function (p, g, n, dk) {
+        chk(p);
+        if (D.rosters[g].indexOf(n) >= 0) throw new Error(g + '에 이미 같은 이름이 있습니다.');
+        if (D.rosters[g].length >= D.capacity) throw new Error(g + ' 정원 ' + D.capacity + '명이 모두 찼습니다. 설정에서 정원을 늘려 주세요.');
+        D.rosters[g].push(n); D.rosters[g].sort(byName);
+        return st(dk, g);
+      },
+      getSummary: function (p, dk) {
+        chk(p);
+        var total = 0;
+        var grades = GR.map(function (g) {
+          var r = D.resp[dk + '|' + g] || {}, transit = [], answered = 0;
+          D.rosters[g].forEach(function (n) { if (r[n]) answered++; if (r[n] === WAYS[0]) transit.push(n); });
+          total += transit.length;
+          return { grade: g, total: D.rosters[g].length, answered: answered, transit: transit };
+        });
+        return { date: dk, transitTotal: total, grades: grades };
+      },
+      saveSettings: function (p, c, dk, g) {
+        chk(p);
+        GR.forEach(function (x) {
+          if (c.rosters[x].length > c.capacity) throw new Error(x + ' 명단이 ' + c.rosters[x].length + '명으로 정원 ' + c.capacity + '명보다 많습니다.');
+        });
+        D.year = c.year; D.capacity = c.capacity; D.open = c.open;
+        GR.forEach(function (x) { D.rosters[x] = c.rosters[x].slice().sort(byName); });
+        return st(dk, g);
+      }
+    };
+  })();
+
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      if (!LIVE) {
+        setTimeout(function () { try { resolve(demo[fn].apply(null, args)); } catch (e) { reject(e); } }, 200);
+        return;
+      }
+      if (!GAS) { post(fn, args).then(resolve, reject); return; }
+      var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      r[fn].apply(r, args);
+    });
+  }
+  /** GitHub에서 열렸을 때: Apps Script 웹 앱에 요청을 보낸다.
+   *  Apps Script는 미리 확인(OPTIONS) 요청에 답하지 못하므로 text/plain 단순 요청으로만 보낸다. */
+  function post(fn, args) {
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) })
+      .then(function (r) { return r.text(); }, function () { throw new Error('저장 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.'); })
+      .then(function (t) {
+        var o;
+        try { o = JSON.parse(t); } catch (e) { throw new Error('저장 서버가 답하지 않습니다. Apps Script 배포의 액세스가 "모든 사용자"인지 확인해 주세요.'); }
+        if (!o || !o.ok) throw new Error((o && o.error) || '다시 시도해 주세요.');
+        return o.data;
+      });
+  }
+  function msgOf(e) { return String((e && e.message) || e || '다시 시도해 주세요.').replace(/^(Exception|Error):\s*/, ''); }
+
+  /* ───────── 작은 도구 ───────── */
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, kids) {
+    var e = document.createElement(tag), k;
+    for (k in (attrs || {})) {
+      if (k === 'text') e.textContent = attrs[k];
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] !== false && attrs[k] != null) e.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return e;
+  }
+  var MARK = '<svg class="mark" viewBox="0 0 40 40" role="img" aria-label="동그라미"><path pathLength="1" d="M21 5c9.5-.5 15 6 14.5 15S29 35.5 19.5 35 4.5 28.5 5 19.5 12 5 23.5 6"/></svg>';
+  var toastTimer;
+  function toast(text, bad) {
+    var t = $('toast');
+    t.textContent = text; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, bad ? 4500 : 2200);
+  }
+  function fail(e) { toast(msgOf(e), true); }
+  function store(kind, key, val) {
+    try {
+      var s = kind === 's' ? window.sessionStorage : window.localStorage;
+      if (val === undefined) return s.getItem(key) || '';
+      if (val === '') s.removeItem(key); else s.setItem(key, val);
+    } catch (e) {}
+    return '';
+  }
+  var NAME_RE = /^[\p{L}][\p{L}\p{N} .-]{0,19}$/u;
+  function cleanName(raw) { return String(raw || '').replace(/\s+/g, ' ').trim(); }
+
+  /* ───────── 상태 ───────── */
+  var body = document.body;
+  var VIEW = body.getAttribute('data-view');
+  var FILLED = VIEW === 'student' || VIEW === 'teacher';             // Apps Script가 화면 종류를 채워 넣었는가
+  var APP_URL = body.getAttribute('data-url') || '';
+  var URL_GRADE = body.getAttribute('data-grade') || '';
+  if (!FILLED) {
+    var query = {};
+    try {
+      location.search.replace(/^\?/, '').split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) query[p[0]] = decodeURIComponent(p[1] || ''); });
+    } catch (e) {}
+    VIEW = query.v === 't' ? 'teacher' : 'student';
+    URL_GRADE = GR[parseInt(query.g, 10) - 1] || '';
+    APP_URL = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : '';
+  }
+  if (!/^https?:/.test(APP_URL)) APP_URL = '';
+  if (GR.indexOf(URL_GRADE) < 0) URL_GRADE = '';
+  var HOSTED = !FILLED && !!APP_URL;                                 // GitHub 같은 곳에 올려 연 화면
+  var OWN_DEVICE = VIEW !== 'teacher';                               // 학생 주소로 들어온 기기만 이름을 기억한다
+  var mode = OWN_DEVICE ? 'student' : 'teacher';
+  var S = { year: new Date().getFullYear(), capacity: 20, open: true, grades: GR, rosters: {}, responses: {}, hasPin: false };
+  var date = thisFriday(new Date());
+  var grade = URL_GRADE;
+  var loaded = false, waiting = false, pin = '', authed = false, sheetUrl = '', pending = 0;   // waiting: 학년, 날짜를 바꾼 뒤 응답을 기다리는 중
+  var pick = { way: '' }, justDrawn = '', settingsDirty = false, tab = 'table';
+  var edit = null;        // 주간 표에서 고치는 중인 이름: { old: 기존 이름 또는 null(새 학생), value, busy, fresh }
+  var sum = null;         // 대중교통 명단 (선택한 금요일)
+
+  function roster() { return S.rosters[grade] || []; }
+  function apply(st) {
+    var yearChanged = st.year !== S.year;
+    S.year = st.year; S.capacity = st.capacity; S.open = st.open; S.hasPin = st.hasPin;
+    S.grades = st.grades || GR; S.rosters = st.rosters || {};
+    if (st.date === date && st.grade === grade) { S.responses = st.responses; waiting = false; }
+    loaded = true;
+    var list = fridaysOf(S.year);
+    if (list.indexOf(date) < 0 || yearChanged) {
+      var want = defaultFriday(S.year, new Date());
+      if (want !== date) { date = want; S.responses = {}; waiting = true; load(); }
+    }
+    render();
+  }
+  /** 성공하면 true, 실패하면 안내를 띄우고 false */
+  function load() {
+    return call('getState', date, grade).then(function (st) { apply(st); return true; }, function (e) { fail(e); return false; });
+  }
+  function setGrade(g) {
+    if (g === grade) return;
+    grade = g; S.responses = {}; justDrawn = ''; waiting = true; edit = null;
+    if (mode === 'student') { $('s-name').value = ''; pick.way = ''; }
+    else store('s', 'ride.tgrade', g);
+    render();
+    load().then(function () { if (mode === 'student') onName(); });
+  }
+  function fillSeg(box, onPick) {
+    if (box.childNodes.length !== S.grades.length) {
+      box.textContent = '';
+      S.grades.forEach(function (g) {
+        box.appendChild(el('button', { type: 'button', 'data-grade': g, text: g, onclick: function () { onPick(g); } }));
+      });
+    }
+    Array.prototype.forEach.call(box.childNodes, function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-grade') === grade ? 'true' : 'false');
+    });
+  }
+
+  function render() {
+    body.setAttribute('data-mode', mode);
+    $('role').textContent = mode === 'teacher' ? '교사용' : (grade ? grade + ' ' : '') + '학생용';
+    $('switch').textContent = mode === 'teacher' ? '학생용 화면' : '교사용 화면';
+    $('v-student').hidden = mode !== 'student';
+    $('v-teacher').hidden = mode !== 'teacher';
+    $('demo-note').hidden = LIVE;
+    if (!LIVE) {
+      $('demo-note').textContent = API
+        ? 'index.html 맨 위 API_URL이 Apps Script 웹 앱 주소(…/exec) 형식이 아닙니다. 지금은 저장되지 않는 미리보기로 열렸습니다.'
+        : '미리보기 화면입니다. 여기서 누른 내용은 저장되지 않습니다.' + (HOSTED ? ' index.html 맨 위 API_URL에 Apps Script 주소를 넣으면 구글 시트에 저장됩니다.' : '');
+    }
+    if (mode === 'student') renderStudent(); else renderTeacher();
+  }
+
+  /* ───────── 학생용 ───────── */
+  function renderStudent() {
+    $('s-day').textContent = loaded ? fmtLong(date) : '불러오는 중';
+    $('s-daysub').textContent = loaded ? S.year + '년, 이날 집에 가는 방법을 알려 주세요.' : '';
+    $('s-gradepart').hidden = !!URL_GRADE || !loaded;
+    fillSeg($('s-grades'), setGrade);
+    $('s-rest').hidden = !grade || !loaded;
+    if (!grade) return;
+
+    var list = roster();
+    $('s-count').textContent = '등록 ' + list.length + ' / ' + S.capacity + '명';
+    var cur = cleanName($('s-name').value);
+    var chips = $('s-chips');
+    chips.textContent = '';
+    list.forEach(function (n) {
+      var kids = [n];
+      if (S.responses[n]) kids.push(el('span', { 'class': 'dot', html: MARK.replace('class="mark"', 'class="mark" style="width:14px;height:14px"') }));
+      chips.appendChild(el('button', {
+        type: 'button', 'class': 'chip', 'aria-pressed': n === cur ? 'true' : 'false',
+        onclick: function () { $('s-name').value = n; onName(); }
+      }, kids));
+    });
+    var hint = '';
+    if (cur && S.responses[cur]) hint = '이미 ' + WAY_LABEL[S.responses[cur]] + '(으)로 제출했어요. 바꾸려면 다시 제출하세요.';
+    else if (cur && list.indexOf(cur) < 0) {
+      hint = !S.open ? grade + ' 명단에 없는 이름입니다. 아래에서 이름을 골라 주세요.'
+        : list.length >= S.capacity ? '정원이 다 찼습니다. 아래에서 이름을 골라 주세요.'
+        : '제출하면 ' + grade + ' 명단에 새로 등록됩니다.';
+    } else if (!cur && list.length) hint = '이름을 직접 적거나, 아래에서 눌러 고르세요.';
+    $('s-hint').textContent = hint;
+    Array.prototype.forEach.call(document.querySelectorAll('.way'), function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-way') === pick.way ? 'true' : 'false');
+    });
+  }
+  function onName() {
+    var cur = cleanName($('s-name').value);
+    if (S.responses[cur] && !pick.way) pick.way = S.responses[cur];
+    renderStudent();
+  }
+  function submit() {
+    var name = cleanName($('s-name').value);
+    if (!grade) { toast('학년을 먼저 골라 주세요.', true); return; }
+    if (!name) { toast('이름을 적어 주세요.', true); $('s-name').focus(); return; }
+    if (!NAME_RE.test(name)) { toast('이름은 한글이나 영문으로 20자 이내로 적어 주세요.', true); return; }
+    if (!pick.way) { toast('집에 가는 방법을 골라 주세요.', true); return; }
+    var way = pick.way, g = grade, btn = $('s-submit');
+    btn.disabled = true; btn.textContent = '제출하는 중';
+    var first = roster().indexOf(name) < 0 ? call('registerName', g, name, date) : Promise.resolve();
+    first.then(function () { return call('submitResponse', date, g, name, way); })
+      .then(function (st) {
+        apply(st);
+        if (OWN_DEVICE && mode === 'student') { store('l', 'ride.name', name); store('l', 'ride.grade', g); }
+        $('s-done-way').textContent = WAY_LABEL[way];
+        $('s-done-who').textContent = g + ' ' + name;
+        $('s-done-day').textContent = fmtLong(date) + ' 귀가 방법을 제출했습니다.';
+        $('toast').hidden = true;
+        $('s-form').hidden = true; $('s-done').hidden = false;
+        drawRing($('s-done').querySelector('.ring'));
+      })
+      .catch(fail)
+      .then(function () { btn.disabled = false; btn.textContent = '제출하기'; });
+  }
+  /** 빨간 동그라미를 처음부터 다시 그린다. 링 크기에 맞춰 선 길이를 잰다. */
+  function drawRing(ring) {
+    ring.classList.remove('draw');
+    var box = ring.getBoundingClientRect(), a = box.width / 2, b = box.height / 2;
+    var len = Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b))) * 1.15;
+    ring.style.setProperty('--len', Math.ceil(len) + 'px');
+    ring.classList.add('draw');
+  }
+  function backToForm(clear) {
+    if (clear) { $('s-name').value = ''; pick.way = ''; }
+    $('s-done').hidden = true; $('s-form').hidden = false;
+    renderStudent();
+    if (clear) $('s-name').focus();
+  }
+
+  /* ───────── 교사용 ───────── */
+  function renderTeacher() {
+    $('gate').hidden = authed;
+    $('t-body').hidden = !authed;
+    if (!authed) {
+      $('gate-title').textContent = !loaded ? '불러오는 중' : S.hasPin ? '교사 비밀번호' : '교사 비밀번호 만들기';
+      $('gate-go').textContent = S.hasPin ? '들어가기' : '만들기';
+      $('gate-go').disabled = !loaded;
+      $('gate-hint').textContent = !loaded ? '' : S.hasPin ? '주간 표와 설정은 교사만 볼 수 있습니다.' : '처음 사용하시네요. 교사들이 함께 쓸 비밀번호를 숫자 4~8자리로 정해 주세요.';
+      return;
+    }
+    $('tab-table').setAttribute('aria-selected', tab === 'table' ? 'true' : 'false');
+    $('tab-sum').setAttribute('aria-selected', tab === 'sum' ? 'true' : 'false');
+    $('tab-settings').setAttribute('aria-selected', tab === 'settings' ? 'true' : 'false');
+    $('t-table').hidden = tab !== 'table';
+    $('t-sum').hidden = tab !== 'sum';
+    $('t-settings').hidden = tab !== 'settings';
+    renderTable();
+    if (tab === 'sum') renderSummary();
+    if (tab === 'settings') renderSettings();
+  }
+  function fillDates(sel) {
+    var list = fridaysOf(S.year), now = defaultFriday(S.year, new Date());
+    if (sel.getAttribute('data-year') !== String(S.year)) {
+      sel.textContent = '';
+      list.forEach(function (k) { sel.appendChild(el('option', { value: k, text: fmtLong(k) + (k === now ? ' (이번 주)' : '') })); });
+      sel.setAttribute('data-year', String(S.year));
+    }
+    sel.value = date;
+    return list;
+  }
+
+  function renderTable() {
+    fillSeg($('t-grades'), setGrade);
+    var list = fillDates($('d-select'));
+    var i = list.indexOf(date);
+    $('d-prev').disabled = i <= 0;
+    $('d-next').disabled = i < 0 || i >= list.length - 1;
+    $('t-print-title').textContent = S.year + '년 ' + fmtLong(date) + ' ' + grade + ' 귀가 조사';
+
+    var names = roster(), rows = $('t-rows'), a = 0, b = 0, left = [];
+    rows.textContent = '';
+    editInput = null;
+    var narrow = window.innerWidth < 520;     // 휴대폰: 편집 칸이 동그라미 칸 자리까지 차지한다
+    var total = Math.max(S.capacity, names.length);
+    for (var r = 0; r < total; r++) {
+      var name = names[r];
+      if (!name) {
+        var firstEmpty = r === names.length;
+        var kids = [el('td', { 'class': 'c-no', text: String(r + 1) })];
+        var addingHere = firstEmpty && edit && edit.old === null;
+        if (addingHere) kids.push(editorCell(narrow));
+        else {
+          kids.push(el('td', { 'class': 'c-name' }, firstEmpty ? [el('button', { type: 'button', 'class': 'nm add', text: '+ 학생 추가', onclick: function () { startEdit(null); } })] : []));
+          kids.push(el('td', { 'class': 'c-date' }));
+        }
+        if (!(addingHere && narrow)) kids.push(el('td'), el('td'));
+        rows.appendChild(el('tr', { 'class': 'empty' }, kids));
+        continue;
+      }
+      var way = S.responses[name] || '';
+      if (way === WAYS[0]) a++; else if (way === WAYS[1]) b++; else left.push(name);
+      var cells = [el('td', { 'class': 'c-no', text: String(r + 1) })];
+      var editingHere = edit && edit.old === name;
+      if (editingHere) cells.push(editorCell(narrow));
+      else {
+        cells.push(el('td', { 'class': 'c-name' }, [nameButton(name)]));
+        cells.push(el('td', { 'class': 'c-date', text: fmtShort(date) }));
+      }
+      if (!(editingHere && narrow)) cells.push(markCell(name, WAYS[0], way), markCell(name, WAYS[1], way));
+      rows.appendChild(el('tr', null, cells));
+    }
+    justDrawn = '';
+    if (editInput) { editInput.focus(); if (edit.fresh) { editInput.select(); edit.fresh = false; } }
+    $('t-sum-all').textContent = (a + b) + '명';
+    $('t-sum-a').textContent = String(a);
+    $('t-sum-b').textContent = String(b);
+
+    var st = $('t-status');
+    st.textContent = '';
+    if (waiting) { st.appendChild(el('div', { text: grade + ' 응답을 불러오는 중' })); return; }
+    var line = el('div', null, [grade + ' 응답 ', el('b', { text: String(a + b) }), ' / ' + names.length + '명']);
+    if (names.length && !left.length) line.appendChild(el('span', { 'class': 'all', text: names.length + '명 모두 응답했습니다' }));
+    st.appendChild(line);
+    if (!names.length) st.appendChild(el('div', { 'class': 'left', text: '아직 ' + grade + ' 명단이 없습니다. 설정에서 명단을 붙여넣거나 학생용 QR로 등록받으세요.' }));
+    else if (left.length) st.appendChild(el('div', { 'class': 'left', text: '아직 응답하지 않은 학생: ' + left.join(', ') }));
+  }
+  /* 이름 고치기, 학생 추가 */
+  var editInput = null;
+  function nameButton(name) {
+    return el('button', { type: 'button', 'class': 'nm', text: name, title: '눌러서 이름 고치기', onclick: function () { startEdit(name); } });
+  }
+  function startEdit(name) {
+    edit = { old: name, value: name || '', busy: false, fresh: true };
+    renderTable();
+  }
+  function cancelEdit() { edit = null; renderTable(); }
+  /** 이름 칸과 날짜 칸 자리를 합쳐 입력 칸, 저장, 취소를 넣는다. 좁은 화면에서는 줄 끝까지 쓴다. */
+  function editorCell(narrow) {
+    var input = el('input', { 'class': 'nm-in', type: 'text', maxlength: '20', autocomplete: 'off', 'aria-label': edit.old ? edit.old + ' 이름 고치기' : '새 학생 이름' });
+    input.value = edit.value;
+    input.addEventListener('input', function () { if (edit) edit.value = input.value; });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
+      else if (e.key === 'Escape') { e.stopPropagation(); cancelEdit(); }
+    });
+    editInput = input;
+    return el('td', { 'class': 'c-name editing', colspan: narrow ? '4' : '2' }, [el('div', { 'class': 'edit' }, [
+      input,
+      el('button', { type: 'button', 'class': 'btn small nm-ok', text: '저장', onclick: saveEdit }),
+      el('button', { type: 'button', 'class': 'btn ghost small nm-no', text: '취소', onclick: cancelEdit })
+    ])]);
+  }
+  function saveEdit() {
+    if (!edit || edit.busy) return;
+    var old = edit.old, v = cleanName(edit.value);
+    if (old && v === old) { cancelEdit(); return; }
+    if (!NAME_RE.test(v)) { toast('이름은 한글이나 영문으로 20자 이내로 적어 주세요.', true); return; }
+    edit.busy = true;
+    var job = old ? call('renameStudent', pin, grade, old, v, date) : call('addStudent', pin, grade, v, date);
+    job.then(function (st) {
+      edit = null; sum = null;
+      settingsDirty = false;      // 설정 화면의 명단도 새 명단으로 다시 채운다
+      apply(st);
+      toast(old ? '이름을 고쳤습니다. 지난 기록도 함께 바뀌었습니다.' : v + ' 학생을 추가했습니다.');
+    }).catch(function (e) { if (edit) edit.busy = false; fail(e); });
+  }
+
+  /* 대중교통 명단 */
+  function loadSummary() {
+    var d = date;
+    return call('getSummary', pin, d).then(function (r) {
+      if (r.date === date) { sum = r; if (tab === 'sum') renderSummary(); }
+      return true;
+    }, function (e) { fail(e); return false; });
+  }
+  function summaryText() {
+    var p = partsOf(date), lines = ['[금요일 귀가 조사] ' + p.m + '월 ' + p.d + '일(금) 대중교통'], missing = [];
+    sum.grades.forEach(function (g) {
+      lines.push(g.grade + ' ' + g.transit.length + '명' + (g.transit.length ? ': ' + g.transit.join(', ') : ''));
+      if (g.total > g.answered) missing.push(g.grade + ' ' + (g.total - g.answered) + '명');
+    });
+    lines.push('합계 ' + sum.transitTotal + '명');
+    if (missing.length) lines.push('미응답: ' + missing.join(', '));
+    return lines.join('\n');
+  }
+  function renderSummary() {
+    fillDates($('m-select'));
+    $('m-print-title').textContent = S.year + '년 ' + fmtLong(date) + ' 대중교통 귀가 명단';
+    var rows = $('m-rows'), st = $('m-status');
+    rows.textContent = ''; st.textContent = '';
+    var ready = sum && sum.date === date;
+    $('m-copy').disabled = !ready;
+    if (!ready) {
+      st.textContent = '명단을 불러오는 중';
+      $('m-total').textContent = ''; $('m-note').textContent = ''; $('m-text').value = '';
+      return;
+    }
+    var missing = 0, people = 0;
+    sum.grades.forEach(function (g) {
+      var names = el('td', { 'class': 'c-names', text: g.transit.length ? g.transit.join(', ') : (g.total ? '없음' : '명단 없음') });
+      if (g.total > g.answered) names.appendChild(el('small', { text: '아직 응답하지 않은 학생 ' + (g.total - g.answered) + '명' }));
+      missing += g.total - g.answered; people += g.total;
+      rows.appendChild(el('tr', null, [el('td', { 'class': 'c-grade', text: g.grade }), el('td', { 'class': 'c-count', text: g.transit.length + '명' }), names]));
+    });
+    $('m-total').textContent = sum.transitTotal + '명';
+    $('m-note').textContent = !people ? '' : missing ? '전체 미응답 ' + missing + '명' : '모든 학년이 응답을 마쳤습니다';
+    var line = el('div', null, ['응답 ' + sum.grades.map(function (g) { return g.grade + ' ' + g.answered + '/' + g.total; }).join(', ')]);
+    if (people && !missing) line.appendChild(el('span', { 'class': 'all', text: '모두 응답했습니다' }));
+    st.appendChild(line);
+    var area = $('m-text');
+    area.value = summaryText();
+    area.style.height = 'auto';                           // 글 길이에 맞춰 상자 높이를 늘린다
+    area.style.height = (area.scrollHeight + 4) + 'px';
+  }
+  function copySummary() {
+    var area = $('m-text'), text = area.value;
+    function byHand() {
+      area.focus(); area.select();
+      try { return document.execCommand('copy'); } catch (e) { return false; }
+    }
+    var job = (navigator.clipboard && navigator.clipboard.writeText)
+      ? navigator.clipboard.writeText(text).then(function () { return true; }, byHand)
+      : Promise.resolve(byHand());
+    job.then(function (ok) {
+      if (ok) toast('복사했습니다. 카톡에 붙여넣으세요.');
+      else { area.focus(); area.select(); toast('자동 복사가 막혀 있습니다. 선택된 글을 길게 눌러 복사하세요.', true); }
+    });
+  }
+
+  function markCell(name, way, cur) {
+    var on = cur === way;
+    var btn = el('button', {
+      type: 'button', 'class': 'cell', 'aria-pressed': on ? 'true' : 'false',
+      'aria-label': name + ' ' + WAY_LABEL[way],
+      html: on ? MARK : '',
+      onclick: function () { toggleMark(name, way); }
+    });
+    btn.disabled = waiting;
+    if (on && justDrawn === name + '|' + way) btn.firstChild.classList.add('draw');
+    return el('td', null, [btn]);
+  }
+  function toggleMark(name, way) {
+    var before = S.responses[name] || '', next = before === way ? '' : way, at = date, ag = grade;
+    if (next) S.responses[name] = next; else delete S.responses[name];
+    justDrawn = next ? name + '|' + next : '';
+    renderTable();
+    pending++;
+    call('teacherMark', pin, at, ag, name, next)
+      .then(function (st) { pending--; sum = null; if (!pending) apply(st); })
+      .catch(function (e) {
+        pending--;
+        if (at === date && ag === grade) { if (before) S.responses[name] = before; else delete S.responses[name]; renderTable(); }
+        fail(e);
+      });
+  }
+  function goDate(k) {
+    if (!k || k === date) return;
+    date = k; S.responses = {}; waiting = true; edit = null; sum = null;
+    renderTable();
+    if (tab === 'sum') { renderSummary(); loadSummary(); }
+    load();
+  }
+
+  function studentUrl(i) { return (APP_URL || 'https://script.google.com/macros/s/.../exec') + (i == null ? '' : '?g=' + (i + 1)); }
+  function renderSettings() {
+    var boxes = $('c-rosters'), cards = $('qr-cards');
+    if (boxes.childNodes.length !== S.grades.length) {
+      boxes.textContent = ''; cards.textContent = '';
+      S.grades.forEach(function (g, i) {
+        boxes.appendChild(el('div', null, [
+          el('label', { 'class': 'lab', 'for': 'c-names-' + i, style: 'display:flex;justify-content:space-between' }, [
+            el('b', { text: g, style: 'color:var(--ink);font-size:15px' }), el('span', { id: 'c-count-' + i })
+          ]),
+          el('textarea', { 'class': 'field', id: 'c-names-' + i, spellcheck: 'false', placeholder: g + ' 명단', oninput: function () { settingsDirty = true; countNames(); } })
+        ]));
+        cards.appendChild(el('div', { 'class': 'qrcard' }, [
+          g, el('div', { 'class': 'qr', id: 'qr-' + i }),
+          el('button', { type: 'button', 'class': 'btn small', text: '크게 보기', 'data-qr': String(i), onclick: function () { showQr(i, this); } })
+        ]));
+      });
+    }
+    if (!settingsDirty) {
+      $('c-year').value = S.year;
+      $('c-cap').value = S.capacity;
+      $('c-open').checked = S.open;
+      S.grades.forEach(function (g, i) { $('c-names-' + i).value = (S.rosters[g] || []).join('\n'); });
+    }
+    countNames();
+    var y = parseInt($('c-year').value, 10);
+    if (y >= 2000 && y <= 2100) {
+      var f = fridaysOf(y);
+      $('c-yearhint').textContent = y + '년 금요일은 ' + fmtShort(f[0]) + '부터 ' + fmtShort(f[f.length - 1]) + '까지 ' + f.length + '번입니다. 화면을 열면 그 주 금요일이 자동으로 선택됩니다.';
+    } else $('c-yearhint').textContent = '';
+    S.grades.forEach(function (g, i) { drawQr($('qr-' + i), studentUrl(i)); });
+    $('u-student').value = studentUrl(null);
+    $('u-teacher').value = studentUrl(null) + '?v=t';
+    $('qr-hint').hidden = !!APP_URL;
+    var link = $('sheet-link');
+    link.hidden = !sheetUrl;
+    if (sheetUrl) link.href = sheetUrl;
+  }
+  function namesFromBox(i) {
+    var out = [];
+    $('c-names-' + i).value.split(/[\n,]+/).forEach(function (raw) {
+      var n = cleanName(raw);
+      if (n && out.indexOf(n) < 0) out.push(n);
+    });
+    return out;
+  }
+  function countNames() {
+    var cap = parseInt($('c-cap').value, 10) || 0;
+    S.grades.forEach(function (g, i) {
+      var n = namesFromBox(i).length, c = $('c-count-' + i);
+      c.textContent = n + ' / ' + cap + '명' + (n > cap ? ' (정원 초과)' : '');
+      c.style.color = n > cap ? 'var(--pencil)' : '';
+    });
+  }
+  function saveSettings() {
+    var rosters = {}, bad = '';
+    S.grades.forEach(function (g, i) {
+      rosters[g] = namesFromBox(i);
+      rosters[g].forEach(function (n) { if (!bad && !NAME_RE.test(n)) bad = g + ' ' + n; });
+    });
+    if (bad) { toast('이름을 확인해 주세요: ' + bad, true); return; }
+    var cfg = { year: parseInt($('c-year').value, 10), capacity: parseInt($('c-cap').value, 10), open: $('c-open').checked, rosters: rosters };
+    var btn = $('c-save');
+    btn.disabled = true;
+    call('saveSettings', pin, cfg, date, grade)
+      .then(function (st) { settingsDirty = false; sum = null; $('d-select').removeAttribute('data-year'); $('m-select').removeAttribute('data-year'); apply(st); toast('설정을 저장했습니다. 명단을 가나다순으로 정리했습니다.'); })
+      .catch(fail)
+      .then(function () { btn.disabled = false; });
+  }
+  function drawQr(box, text) {
+    if (box.getAttribute('data-text') === text) return;
+    var q = qrcode(0, 'M');
+    q.addData(text); q.make();
+    var n = q.getModuleCount(), m = 2, d = '';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
+    box.innerHTML = '<svg viewBox="0 0 ' + (n + m * 2) + ' ' + (n + m * 2) + '" shape-rendering="crispEdges" role="img" aria-label="학생용 QR 코드"><path fill="#15284B" d="' + d + '"/></svg>';
+    box.setAttribute('data-text', text);
+  }
+  var qrOpener = null;
+  function showQr(i, opener) {
+    var u = studentUrl(i);
+    qrOpener = opener;
+    $('qr-title').textContent = S.grades[i] + ', 휴대폰 카메라로 찍어 주세요';
+    drawQr($('qr-large'), u); $('qr-url').textContent = u; $('qr-overlay').hidden = false; $('qr-close').focus();
+  }
+  function closeQr() { $('qr-overlay').hidden = true; if (qrOpener) qrOpener.focus(); }
+
+  function enter() {
+    var v = $('gate-pin').value.trim(), btn = $('gate-go');
+    if (!/^\d{4,8}$/.test(v)) { toast('비밀번호는 숫자 4~8자리입니다.', true); return; }
+    btn.disabled = true;
+    var first = S.hasPin ? Promise.resolve() : call('setPin', '', v);
+    first.then(function () { return call('checkPin', v); })
+      .then(function (info) {
+        pin = v; authed = true; S.hasPin = true; sheetUrl = (info && info.sheetUrl) || '';
+        store('s', 'ride.pin', v); $('gate-pin').value = '';
+        render();
+      })
+      .catch(fail)
+      .then(function () { btn.disabled = false; });
+  }
+  /** 교사 화면은 항상 한 학년을 보고 있어야 한다. */
+  function teacherGrade() {
+    if (grade) return;
+    var saved = store('s', 'ride.tgrade');
+    grade = GR.indexOf(saved) >= 0 ? saved : GR[0];
+  }
+
+  /* ───────── 연결 ───────── */
+  $('s-name').addEventListener('input', onName);
+  Array.prototype.forEach.call(document.querySelectorAll('.way'), function (b) {
+    b.addEventListener('click', function () {
+      pick.way = b.getAttribute('data-way');
+      renderStudent();
+      drawRing(b.querySelector('.ring'));
+    });
+  });
+  $('s-submit').addEventListener('click', submit);
+  $('s-name').addEventListener('keydown', function (e) { if (e.key === 'Enter' && pick.way) submit(); });
+  $('s-edit').addEventListener('click', function () { backToForm(false); });
+  $('s-next').addEventListener('click', function () { backToForm(true); });
+
+  $('gate-go').addEventListener('click', enter);
+  $('gate-pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') enter(); });
+  $('tab-table').addEventListener('click', function () { tab = 'table'; render(); });
+  $('tab-sum').addEventListener('click', function () { tab = 'sum'; edit = null; render(); loadSummary(); });
+  $('tab-settings').addEventListener('click', function () { tab = 'settings'; edit = null; render(); });
+  $('m-select').addEventListener('change', function () { goDate(this.value); });
+  $('m-refresh').addEventListener('click', function () { loadSummary().then(function (ok) { if (ok) toast('새로 불러왔습니다.'); }); });
+  $('m-print').addEventListener('click', function () { window.print(); });
+  $('m-copy').addEventListener('click', copySummary);
+  $('d-select').addEventListener('change', function () { goDate(this.value); });
+  $('d-prev').addEventListener('click', function () { var l = fridaysOf(S.year); goDate(l[l.indexOf(date) - 1]); });
+  $('d-next').addEventListener('click', function () { var l = fridaysOf(S.year); goDate(l[l.indexOf(date) + 1]); });
+  $('d-today').addEventListener('click', function () { goDate(defaultFriday(S.year, new Date())); });
+  $('t-refresh').addEventListener('click', function () { load().then(function (ok) { if (ok) toast('새로 불러왔습니다.'); }); });
+  $('t-print').addEventListener('click', function () { window.print(); });
+
+  ['c-year', 'c-cap'].forEach(function (id) {
+    $(id).addEventListener('input', function () { settingsDirty = true; renderSettings(); });
+  });
+  $('c-open').addEventListener('change', function () { settingsDirty = true; });
+  $('c-save').addEventListener('click', saveSettings);
+  $('p-save').addEventListener('click', function () {
+    var v = $('p-new').value.trim();
+    call('setPin', pin, v).then(function () { pin = v; store('s', 'ride.pin', v); $('p-new').value = ''; toast('비밀번호를 바꿨습니다.'); }).catch(fail);
+  });
+  $('qr-close').addEventListener('click', closeQr);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('qr-overlay').hidden) closeQr(); });
+  ['u-student', 'u-teacher'].forEach(function (id) { $(id).addEventListener('focus', function () { this.select(); }); });
+  $('switch').addEventListener('click', function () {
+    mode = mode === 'teacher' ? 'student' : 'teacher';
+    var before = grade;
+    if (mode === 'teacher') teacherGrade();
+    render(); window.scrollTo(0, 0);
+    if (grade !== before) load();
+  });
+
+  // 교사 화면을 열어 둔 동안 15초마다 새 응답을 불러온다
+  setInterval(function () {
+    if (mode !== 'teacher' || !authed || pending || edit || document.visibilityState !== 'visible') return;
+    if (tab === 'table') call('getState', date, grade).then(function (st) { if (!pending && !edit) apply(st); }).catch(function () {});
+    else if (tab === 'sum') call('getSummary', pin, date).then(function (r) { if (r.date === date && tab === 'sum') { sum = r; renderSummary(); } }).catch(function () {});
+  }, 15000);
+
+  /* ───────── 시작 ───────── */
+  if (mode === 'teacher') teacherGrade();
+  else {
+    var savedGrade = store('l', 'ride.grade');
+    if (!grade && GR.indexOf(savedGrade) >= 0) grade = savedGrade;
+    if (grade && grade === savedGrade) $('s-name').value = store('l', 'ride.name');
+  }
+  render();
+  load().then(function () {
+    if (mode === 'student') onName();
+    var saved = store('s', 'ride.pin');
+    if (saved && S.hasPin) {
+      call('checkPin', saved).then(function (info) {
+        pin = saved; authed = true; sheetUrl = (info && info.sheetUrl) || ''; render();
+      }).catch(function () { store('s', 'ride.pin', ''); });
+    }
+  });
+})();
+</script>
+</body>
+</html>
