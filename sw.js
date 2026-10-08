@@ -3,7 +3,7 @@
  * - 응답 저장(구글 Apps Script)과 글꼴 같은 다른 주소의 요청은 건드리지 않는다.
  * - 새 버전을 올리면 다음에 열 때 새 화면으로 바뀐다.
  */
-var VERSION = '0177fc2609';
+var VERSION = '2677b68d64';
 var CACHE = 'ride-' + VERSION;
 var FILES = [
     "./",
