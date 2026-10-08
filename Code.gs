@@ -1,5 +1,5 @@
 /**
- * 금요일 귀가 조사 웹앱 (서버) — 학년별 버전
+ * 귀가 조사 웹앱 (서버)
  *
  * 설치: 구글 시트 > 확장 프로그램 > Apps Script 에서
  *   1) 이 파일 내용을 Code.gs 에 붙여넣고
@@ -8,21 +8,27 @@
  *
  * 화면을 GitHub에 올려 쓸 때는 2)를 건너뛰고, 3)에서 나온 웹 앱 주소(.../exec)를
  * index.html 맨 위 API_URL 에 붙여넣습니다. 이 파일은 두 방식에 똑같이 씁니다.
+ * 코드를 고친 뒤에는 배포 > 배포 관리 > 수정(연필) > 버전: 새 버전 으로 다시 배포해야 반영됩니다.
  *
  * 주소 (Apps Script 주소 또는 GitHub 주소 뒤에)
  *   (없음)   학생용 (학년을 먼저 고름)
  *   ?g=1     1학년 학생용 (g=2, g=3 도 같음)
  *   ?v=t     교사용
  *
- * 시트 탭: 설정, 명단(학년, 번호, 이름), 응답(원본 기록), 누적표 2026 1학년 ... (연도, 학년별 ○ 표)
+ * 조사 날짜: 기본은 매주 금요일. 설정에서 그 주(월~일) 안의 다른 날로 바꿀 수 있다.
+ * 시트 탭: 설정(연도, 정원, 등록, 바뀐 날짜), 명단(학년, 번호, 이름), 응답(원본 기록),
+ *          누적표 2026 1학년 ... (연도, 학년별 ○ 표)
  */
 
 var SH = { SET: '설정', ROSTER: '명단', RESP: '응답', CUM: '누적표 ' };
 var GRADES = ['1학년', '2학년', '3학년'];
 var METHODS = ['대중교통', '부모님차량'];
+var DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 var MARK = '○';
 var CUM_NAME_ROW = 4;            // 누적표에서 이름이 시작되는 행
 var CUM_DATE_COL = 3;            // 누적표에서 날짜가 시작되는 열 (A 번호, B 이름)
+var SET_ROWS = 60;               // 설정 탭에서 읽는 줄 수 (1~3행 설정, 5행 제목, 6행부터 바뀐 날짜)
+var OVR_ROW = 5;
 var NAME_RE = /^[\p{L}][\p{L}\p{N} .-]{0,19}$/u;
 
 /* ───────── 화면 ───────── */
@@ -36,14 +42,14 @@ function doGet(e) {
     page = HtmlService.createHtmlOutputFromFile('Index').getContent();
   } catch (err) {
     // 화면을 GitHub에 올려 쓰는 경우: 이 프로젝트에는 Index 파일이 없고 저장만 맡는다
-    return ContentService.createTextOutput('금요일 귀가 조사 저장 서버가 동작 중입니다. 화면은 GitHub 주소로 열어 주세요.');
+    return ContentService.createTextOutput('귀가 조사 저장 서버가 동작 중입니다. 화면은 GitHub 주소로 열어 주세요.');
   }
   var html = page
     .split('__VIEW__').join(view)
     .split('__GRADE__').join(grade)
     .split('__APP_URL__').join(ScriptApp.getService().getUrl() || '');
   return HtmlService.createHtmlOutput(html)
-    .setTitle('금요일 귀가 조사')
+    .setTitle('귀가 조사')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -56,7 +62,8 @@ function api_() {
   return {
     getState: getState, registerName: registerName, submitResponse: submitResponse,
     checkPin: checkPin, setPin: setPin, teacherMark: teacherMark, saveSettings: saveSettings,
-    renameStudent: renameStudent, addStudent: addStudent, getSummary: getSummary
+    renameStudent: renameStudent, addStudent: addStudent, getSummary: getSummary,
+    setWeekDate: setWeekDate
   };
 }
 
@@ -77,29 +84,31 @@ function doPost(e) {
 /* ───────── 누구나 쓰는 기능 (학생용) ───────── */
 
 function getState(dateKey, grade) {
+  fresh_();
   return state_(dateKey, grade);
 }
 
-/** QR로 들어온 학생이 자기 이름을 그 학년 명단에 올린다. */
+/** QR로 들어온 학생이 자기 이름을 그 학년 명단에 올린다. 이미 있으면 그대로 둔다. */
 function registerName(grade, rawName, dateKey) {
+  fresh_();
   return locked_(function () {
     checkGrade_(grade);
     var name = cleanName_(rawName);
-    var set = readSettings_();
-    var rosters = readRosters_();
-    if (rosters[grade].indexOf(name) < 0) {
-      if (!set.open) throw new Error('지금은 이름 등록을 받지 않습니다. 선생님께 말씀드리세요.');
-      if (rosters[grade].length >= set.capacity) throw new Error(grade + ' 정원 ' + set.capacity + '명이 모두 등록되었습니다. 선생님께 말씀드리세요.');
-      rosters[grade].push(name);
-      writeRosters_(rosters);
-    }
+    if (readRosters_()[grade].indexOf(name) < 0) enroll_(grade, name, true);
     return state_(dateKey, grade);
   });
 }
 
-function submitResponse(dateKey, grade, rawName, method) {
+/** register 가 true 이면 명단에 없는 이름을 먼저 등록한다 (요청 한 번으로 끝낸다). */
+function submitResponse(dateKey, grade, rawName, method, register) {
+  fresh_();
   return locked_(function () {
     if (METHODS.indexOf(method) < 0) throw new Error('귀가 방법을 골라 주세요.');
+    if (register) {
+      checkGrade_(grade);
+      var name = cleanName_(rawName);
+      if (readRosters_()[grade].indexOf(name) < 0) enroll_(grade, name, true);
+    }
     return mark_(dateKey, grade, rawName, method, '학생');
   });
 }
@@ -107,21 +116,25 @@ function submitResponse(dateKey, grade, rawName, method) {
 /* ───────── 교사용 기능 (비밀번호 필요) ───────── */
 
 function checkPin(pin) {
+  fresh_();
   checkPin_(pin);
   return { sheetUrl: ss_().getUrl() };
 }
 
 function setPin(oldPin, newPin) {
+  fresh_();
   return locked_(function () {
     if (getPin_()) checkPin_(oldPin);
     if (!/^\d{4,8}$/.test(String(newPin))) throw new Error('비밀번호는 숫자 4~8자리로 정해 주세요.');
     PropertiesService.getScriptProperties().setProperty('PIN', String(newPin));
+    memo_().pin = String(newPin);
     return true;
   });
 }
 
 /** method 가 빈 문자열이면 표시를 지운다. */
 function teacherMark(pin, dateKey, grade, rawName, method) {
+  fresh_();
   checkPin_(pin);
   return locked_(function () {
     if (method !== '' && METHODS.indexOf(method) < 0) throw new Error('귀가 방법을 골라 주세요.');
@@ -131,6 +144,7 @@ function teacherMark(pin, dateKey, grade, rawName, method) {
 
 /** cfg = { year, capacity, open, rosters: { '1학년': [이름...], ... } } */
 function saveSettings(pin, cfg, dateKey, grade) {
+  fresh_();
   checkPin_(pin);
   return locked_(function () {
     var year = parseInt(cfg.year, 10);
@@ -157,6 +171,7 @@ function saveSettings(pin, cfg, dateKey, grade) {
 
 /** 주간 표에서 이름을 고친다. 지난 응답과 누적표 기록도 새 이름으로 따라온다. */
 function renameStudent(pin, grade, oldName, rawNew, dateKey) {
+  fresh_();
   checkPin_(pin);
   return locked_(function () {
     checkGrade_(grade);
@@ -171,12 +186,13 @@ function renameStudent(pin, grade, oldName, rawNew, dateKey) {
     writeRosters_(rosters);
 
     var sh = sheet_(SH.RESP), years = {};
-    years[String(readSettings_().year)] = true;
+    years[String(readConfig_().year)] = true;
     readResponses_().forEach(function (r) {
       if (r.grade !== grade || r.name !== old) return;
       sh.getRange(r.row, 4).setNumberFormat('@').setValue(name);
       years[r.date.slice(0, 4)] = true;
     });
+    memo_().resp = null;
     Object.keys(years).forEach(function (y) { rebuildCumulative_(y, grade); });
     return state_(dateKey, grade);
   });
@@ -184,25 +200,23 @@ function renameStudent(pin, grade, oldName, rawNew, dateKey) {
 
 /** 주간 표의 빈 줄에 교사가 학생을 추가한다 (QR 등록이 닫혀 있어도 된다). */
 function addStudent(pin, grade, rawName, dateKey) {
+  fresh_();
   checkPin_(pin);
   return locked_(function () {
     checkGrade_(grade);
     var name = cleanName_(rawName);
-    var set = readSettings_();
-    var rosters = readRosters_();
-    if (rosters[grade].indexOf(name) >= 0) throw new Error(grade + '에 이미 같은 이름이 있습니다.');
-    if (rosters[grade].length >= set.capacity) throw new Error(grade + ' 정원 ' + set.capacity + '명이 모두 찼습니다. 설정에서 정원을 늘려 주세요.');
-    rosters[grade].push(name);
-    writeRosters_(rosters);
-    rebuildCumulative_(set.year, grade);
+    if (readRosters_()[grade].indexOf(name) >= 0) throw new Error(grade + '에 이미 같은 이름이 있습니다.');
+    enroll_(grade, name, false);
+    rebuildCumulative_(readConfig_().year, grade);
     return state_(dateKey, grade);
   });
 }
 
-/** 그 금요일에 대중교통으로 가는 학생을 학년별로 모은다. */
+/** 그날 대중교통으로 가는 학생을 학년별로 모은다. */
 function getSummary(pin, dateKey) {
+  fresh_();
   checkPin_(pin);
-  if (!isFriday_(dateKey)) throw new Error('금요일 날짜가 아닙니다.');
+  if (!isDate_(dateKey)) throw new Error('날짜를 확인해 주세요.');
   var rosters = readRosters_(), by = {};
   readResponses_().forEach(function (r) {
     if (r.date === dateKey && r.method) by[r.grade + '|' + r.name] = r.method;
@@ -221,34 +235,90 @@ function getSummary(pin, dateKey) {
   return { date: dateKey, transitTotal: total, grades: grades };
 }
 
+/**
+ * 그 주의 조사 날짜를 바꾼다. friday 는 그 주의 금요일, newDate 는 같은 주(월~일) 안의 날.
+ * newDate 가 금요일 자신이면 원래대로 되돌린다. 이미 받은 응답도 새 날짜로 옮긴다.
+ */
+function setWeekDate(pin, friday, newDate, grade) {
+  fresh_();
+  checkPin_(pin);
+  return locked_(function () {
+    if (!isDate_(friday) || toDate_(friday).getDay() !== 5) throw new Error('기준이 되는 금요일을 확인해 주세요.');
+    if (!isDate_(newDate)) throw new Error('바꿀 날짜를 확인해 주세요.');
+    var cfg = readConfig_();
+    if (friday.slice(0, 4) !== String(cfg.year) || newDate.slice(0, 4) !== String(cfg.year)) {
+      throw new Error('설정된 연도(' + cfg.year + ')의 날짜만 고를 수 있습니다.');
+    }
+    if (weekFriday_(newDate) !== friday) throw new Error('같은 주(월요일~일요일) 안의 날짜만 고를 수 있습니다.');
+    var old = cfg.overrides[friday] || friday;
+    if (old !== newDate) {
+      var sh = sheet_(SH.RESP);
+      readResponses_().forEach(function (r) {
+        if (r.date === old) sh.getRange(r.row, 2).setNumberFormat('@').setValue(newDate);
+      });
+      memo_().resp = null;
+      if (newDate === friday) delete cfg.overrides[friday]; else cfg.overrides[friday] = newDate;
+      writeOverrides_(cfg.overrides);
+      GRADES.forEach(function (g) { rebuildCumulative_(cfg.year, g); });
+    }
+    return state_(newDate, grade);
+  });
+}
+
 /* ───────── 내부: 상태, 검증 ───────── */
 
 function state_(dateKey, grade) {
-  var set = readSettings_();
+  var cfg = readConfig_();
   var g = GRADES.indexOf(grade) >= 0 ? grade : '';
-  var responses = {};
-  if (g && isFriday_(dateKey)) {
+  var all = {};
+  GRADES.forEach(function (x) { all[x] = {}; });
+  if (isDate_(dateKey)) {
     readResponses_().forEach(function (r) {
-      if (r.date === dateKey && r.grade === g && r.method) responses[r.name] = r.method;
+      if (r.date === dateKey && r.method && all[r.grade]) all[r.grade][r.name] = r.method;
     });
   }
+  var overrides = {};
+  Object.keys(cfg.overrides).forEach(function (k) { overrides[k] = cfg.overrides[k]; });
   return {
-    year: set.year, capacity: set.capacity, open: set.open,
-    grades: GRADES, rosters: readRosters_(), responses: responses,
+    year: cfg.year, capacity: cfg.capacity, open: cfg.open,
+    grades: GRADES, rosters: readRosters_(), overrides: overrides,
+    responses: g ? all[g] : {}, responsesAll: all,
     date: dateKey || '', grade: g, hasPin: !!getPin_()
   };
 }
 
 function mark_(dateKey, grade, rawName, method, by) {
   checkGrade_(grade);
-  var set = readSettings_();
-  if (!isFriday_(dateKey)) throw new Error('금요일 날짜가 아닙니다.');
-  if (String(dateKey).slice(0, 4) !== String(set.year)) throw new Error('설정된 연도(' + set.year + ')와 다른 날짜입니다.');
+  var cfg = readConfig_();
+  checkSurveyDate_(dateKey, cfg);
   var name = cleanName_(rawName);
   if (readRosters_()[grade].indexOf(name) < 0) throw new Error(grade + ' 명단에 없는 이름입니다.');
   upsertResponse_(dateKey, grade, name, method, by);
-  markCumulative_(set.year, grade, dateKey, name, method);
+  markCumulative_(cfg.year, grade, dateKey, name, method);
   return state_(dateKey, grade);
+}
+
+/** 명단에 한 명을 넣는다. 학생이 스스로 등록할 때는 등록이 열려 있어야 한다. */
+function enroll_(grade, name, byStudent) {
+  var cfg = readConfig_();
+  var rosters = readRosters_();
+  if (byStudent && !cfg.open) throw new Error('지금은 이름 등록을 받지 않습니다. 선생님께 말씀드리세요.');
+  if (rosters[grade].length >= cfg.capacity) {
+    throw new Error(byStudent
+      ? grade + ' 정원 ' + cfg.capacity + '명이 모두 등록되었습니다. 선생님께 말씀드리세요.'
+      : grade + ' 정원 ' + cfg.capacity + '명이 모두 찼습니다. 설정에서 정원을 늘려 주세요.');
+  }
+  rosters[grade].push(name);
+  writeRosters_(rosters);
+}
+
+/** 그 주의 조사 날짜(기본 금요일, 바뀌었으면 바뀐 날)만 받는다. */
+function checkSurveyDate_(dateKey, cfg) {
+  if (!isDate_(dateKey)) throw new Error('조사 날짜가 아닙니다. 날짜를 확인해 주세요.');
+  var f = weekFriday_(dateKey);
+  if (f.slice(0, 4) !== String(cfg.year)) throw new Error('설정된 연도(' + cfg.year + ')와 다른 날짜입니다.');
+  var want = cfg.overrides[f] || f;
+  if (want !== dateKey) throw new Error('조사 날짜가 아닙니다. 이 주의 조사 날짜는 ' + longDate_(want) + '입니다.');
 }
 
 function checkGrade_(grade) {
@@ -266,15 +336,39 @@ function byName_(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function isFriday_(key) {
+function isDate_(key) {
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
   if (!m) return false;
   var d = new Date(+m[1], +m[2] - 1, +m[3]);
-  return d.getMonth() === +m[2] - 1 && d.getDate() === +m[3] && d.getDay() === 5;
+  return d.getMonth() === +m[2] - 1 && d.getDate() === +m[3];
+}
+
+function toDate_(key) {
+  var p = String(key).split('-');
+  return new Date(+p[0], +p[1] - 1, +p[2]);
+}
+
+function keyOf_(d) {
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+/** 그 날이 들어 있는 주(월요일~일요일)의 금요일 */
+function weekFriday_(key) {
+  var d = toDate_(key);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 4);
+  return keyOf_(d);
+}
+
+function longDate_(key) {
+  var d = toDate_(key);
+  return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + DAYS[d.getDay()] + '요일';
 }
 
 function getPin_() {
-  return PropertiesService.getScriptProperties().getProperty('PIN') || '';
+  var m = memo_();
+  if (m.pin === undefined) m.pin = PropertiesService.getScriptProperties().getProperty('PIN') || '';
+  return m.pin;
 }
 
 function checkPin_(pin) {
@@ -289,19 +383,37 @@ function locked_(fn) {
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
+/* ───────── 내부: 한 번 실행하는 동안 읽은 것을 기억해 같은 시트를 다시 읽지 않는다 ───────── */
+
+var M_ = {};
+function fresh_() { M_ = {}; }
+function memo_() { return M_; }
+
 /* ───────── 내부: 시트 읽고 쓰기 ───────── */
 
 function ss_() {
+  var m = memo_();
+  if (m.ss) return m.ss;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('구글 시트의 [확장 프로그램 > Apps Script]에서 만든 스크립트여야 합니다.');
-  return ss;
+  return (m.ss = ss);
+}
+
+/** 탭 목록은 한 번에 읽어 둔다. 없는 탭은 만든다. */
+function sheets_() {
+  var m = memo_();
+  if (!m.sheets) {
+    m.sheets = {};
+    ss_().getSheets().forEach(function (sh) { m.sheets[sh.getName()] = sh; });
+  }
+  return m.sheets;
 }
 
 function sheet_(name) {
-  var ss = ss_();
-  var sh = ss.getSheetByName(name);
-  if (sh) return sh;
-  sh = ss.insertSheet(name);
+  var all = sheets_();
+  if (all[name]) return all[name];
+  var sh = ss_().insertSheet(name);
+  all[name] = sh;
   if (name === SH.SET) {
     sh.getRange(1, 1, 3, 2).setValues([['연도', new Date().getFullYear()], ['학년당 정원', 20], ['QR 이름 등록', '열림']]);
     sh.getRange(1, 1, 3, 1).setFontWeight('bold');
@@ -318,80 +430,120 @@ function sheet_(name) {
   return sh;
 }
 
-function readSettings_() {
-  var v = sheet_(SH.SET).getRange(1, 1, 3, 2).getValues();
+/** 설정과 바뀐 날짜를 한 번에 읽는다. */
+function readConfig_() {
+  var m = memo_();
+  if (m.cfg) return m.cfg;
+  var v = sheet_(SH.SET).getRange(1, 1, SET_ROWS, 2).getValues();
   var year = parseInt(v[0][1], 10), cap = parseInt(v[1][1], 10);
-  return {
+  var overrides = {};
+  for (var i = OVR_ROW; i < v.length; i++) {
+    var f = dateKey_(v[i][0]), d = dateKey_(v[i][1]);
+    if (isDate_(f) && isDate_(d) && weekFriday_(d) === f) overrides[f] = d;
+  }
+  return (m.cfg = {
     year: (year >= 2000 && year <= 2100) ? year : new Date().getFullYear(),
     capacity: (cap >= 1 && cap <= 60) ? cap : 20,
-    open: String(v[2][1]).trim() !== '닫힘'
-  };
+    open: String(v[2][1]).trim() !== '닫힘',
+    overrides: overrides
+  });
 }
 
 function writeSettings_(s) {
   sheet_(SH.SET).getRange(1, 1, 3, 2)
     .setValues([['연도', s.year], ['학년당 정원', s.capacity], ['QR 이름 등록', s.open ? '열림' : '닫힘']]);
+  var cfg = readConfig_();
+  cfg.year = s.year; cfg.capacity = s.capacity; cfg.open = s.open;
 }
 
-/** { '1학년': [가나다순 이름...], '2학년': [...], '3학년': [...] } */
+/** 바뀐 날짜를 설정 탭 5행부터 다시 적는다. 하나도 없으면 제목 줄도 지운다. */
+function writeOverrides_(overrides) {
+  var sh = sheet_(SH.SET);
+  sh.getRange(OVR_ROW, 1, SET_ROWS - OVR_ROW + 1, 2).clearContent();
+  var keys = Object.keys(overrides).sort();
+  if (!keys.length) return;
+  sh.getRange(OVR_ROW, 1, keys.length + 1, 2).setNumberFormat('@');
+  sh.getRange(OVR_ROW, 1, keys.length + 1, 2).setValues([['날짜 변경 (원래 금요일)', '바뀐 날짜']].concat(
+    keys.map(function (k) { return [k, overrides[k]]; })));
+  sh.getRange(OVR_ROW, 1, 1, 2).setFontWeight('bold');
+}
+
+/** { '1학년': [가나다순 이름...], '2학년': [...], '3학년': [...] } (복사본을 돌려준다) */
 function readRosters_() {
-  var out = {};
-  GRADES.forEach(function (g) { out[g] = []; });
-  var sh = sheet_(SH.ROSTER);
-  var last = sh.getLastRow();
-  if (last >= 2) {
-    sh.getRange(2, 1, last - 1, 3).getValues().forEach(function (r) {
-      var g = String(r[0]).trim(), n = String(r[2]).trim();
-      if (out[g] && n && out[g].indexOf(n) < 0) out[g].push(n);
-    });
+  var m = memo_();
+  if (!m.rosters) {
+    var out = {};
+    GRADES.forEach(function (g) { out[g] = []; });
+    var sh = sheet_(SH.ROSTER);
+    var last = sh.getLastRow();
+    if (last >= 2) {
+      sh.getRange(2, 1, last - 1, 3).getValues().forEach(function (r) {
+        var g = String(r[0]).trim(), n = String(r[2]).trim();
+        if (out[g] && n && out[g].indexOf(n) < 0) out[g].push(n);
+      });
+    }
+    GRADES.forEach(function (g) { out[g].sort(byName_); });
+    m.rosters = out;
   }
-  GRADES.forEach(function (g) { out[g].sort(byName_); });
-  return out;
+  var copy = {};
+  GRADES.forEach(function (g) { copy[g] = m.rosters[g].slice(); });
+  return copy;
 }
 
 /** 학년 순, 가나다순으로 다시 적고 번호를 매긴다. */
 function writeRosters_(rosters) {
   var sh = sheet_(SH.ROSTER);
-  var rows = [];
+  var rows = [], kept = {};
   GRADES.forEach(function (g) {
-    (rosters[g] || []).slice().sort(byName_).forEach(function (n, i) { rows.push([g, i + 1, n]); });
+    kept[g] = (rosters[g] || []).slice().sort(byName_);
+    kept[g].forEach(function (n, i) { rows.push([g, i + 1, n]); });
   });
   var last = sh.getLastRow();
   if (last >= 2) sh.getRange(2, 1, last - 1, 3).clearContent();
   if (rows.length) sh.getRange(2, 1, rows.length, 3).setValues(rows);
+  memo_().rosters = kept;
 }
 
 function readResponses_() {
+  var m = memo_();
+  if (m.resp) return m.resp;
   var sh = sheet_(SH.RESP);
   var last = sh.getLastRow();
-  if (last < 2) return [];
-  return sh.getRange(2, 1, last - 1, 6).getValues().map(function (v, i) {
+  if (last < 2) return (m.resp = []);
+  return (m.resp = sh.getRange(2, 1, last - 1, 6).getValues().map(function (v, i) {
     return { row: i + 2, date: dateKey_(v[1]), grade: String(v[2]).trim(), name: String(v[3]).trim(), method: String(v[4]).trim() };
-  });
+  }));
 }
 
 /** 같은 날짜, 학년, 이름이 있으면 그 행을 고치고, 없으면 새 행을 붙인다. method 가 비면 지운다. */
 function upsertResponse_(dateKey, grade, name, method, by) {
   var sh = sheet_(SH.RESP);
-  var found = 0;
-  readResponses_().some(function (r) {
-    if (r.date === dateKey && r.grade === grade && r.name === name) { found = r.row; return true; }
+  var list = readResponses_(), found = null;
+  list.some(function (r) {
+    if (r.date === dateKey && r.grade === grade && r.name === name) { found = r; return true; }
     return false;
   });
-  if (!method) { if (found) sh.deleteRow(found); return; }
+  if (!method) {
+    if (found) { sh.deleteRow(found.row); memo_().resp = null; }
+    return;
+  }
   var row = [new Date(), dateKey, grade, name, method, by];
   if (found) {
-    sh.getRange(found, 2, 1, 3).setNumberFormat('@');
-    sh.getRange(found, 1, 1, 6).setValues([row]);
+    sh.getRange(found.row, 2, 1, 3).setNumberFormat('@');
+    sh.getRange(found.row, 1, 1, 6).setValues([row]);
+    found.method = method;
   } else {
     sh.appendRow(row);
+    list.push({ row: -1, date: dateKey, grade: grade, name: name, method: method });   // 행 번호는 이번 실행에서 다시 쓰지 않는다
   }
 }
 
 /** 시트가 날짜처럼 생긴 글자를 Date로 바꿔 놓아도 'YYYY-MM-DD' 로 되돌린다. */
 function dateKey_(v) {
   if (Object.prototype.toString.call(v) === '[object Date]') {
-    return Utilities.formatDate(v, ss_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+    var m = memo_();
+    if (!m.tz) m.tz = ss_().getSpreadsheetTimeZone();
+    return Utilities.formatDate(v, m.tz, 'yyyy-MM-dd');
   }
   return String(v).trim();
 }
@@ -404,25 +556,22 @@ function dateKey_(v) {
  */
 
 function cumSheet_(year, grade) {
-  var ss = ss_(), name = SH.CUM + year + ' ' + grade;
-  return ss.getSheetByName(name) || ss.insertSheet(name);
+  var name = SH.CUM + year + ' ' + grade, all = sheets_();
+  return all[name] || (all[name] = ss_().insertSheet(name));
 }
 
-/** 응답 한 건만 바뀌었을 때 해당 두 칸만 고친다. 여러 명이 동시에 제출해도 빠르다. */
+/** 응답 한 건만 바뀌었을 때 해당 두 칸만 고친다. 표 전체를 한 번에 읽어 위치를 찾는다. */
 function markCumulative_(year, grade, dateKey, name, method) {
   var sh = cumSheet_(year, grade);
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   if (lastRow < CUM_NAME_ROW - 1 || lastCol < CUM_DATE_COL - 1) { rebuildCumulative_(year, grade); return; }
 
-  var names = [];
-  if (lastRow >= CUM_NAME_ROW) {
-    names = sh.getRange(CUM_NAME_ROW, 2, lastRow - CUM_NAME_ROW + 1, 1).getValues()
-      .map(function (r) { return String(r[0]).trim(); });
-  }
+  var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var names = values.slice(CUM_NAME_ROW - 1).map(function (r) { return String(r[1]).trim(); });
   var idx = names.indexOf(name);
   if (idx < 0) { rebuildCumulative_(year, grade); return; }      // 새로 등록된 학생: 가나다순, 번호를 다시 매긴다
 
-  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(dateKey_);
+  var head = values[0].map(dateKey_);
   var col = head.indexOf(dateKey) + 1;
   if (!col) {
     var newest = '';
@@ -447,7 +596,7 @@ function addDateColumns_(sh, col, dateKey) {
   styleCumulative_(sh, col, 2);
 }
 
-/** 가나다순 명단, 날짜순으로 누적표 전체를 다시 그린다 (명단 변경, 지난 날짜 입력 때). */
+/** 가나다순 명단, 날짜순으로 누적표 전체를 다시 그린다 (명단 변경, 지난 날짜 입력, 날짜 변경 때). */
 function rebuildCumulative_(year, grade) {
   var sh = cumSheet_(year, grade);
   var roster = readRosters_()[grade];

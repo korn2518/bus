@@ -1,0 +1,34 @@
+{
+  "id": "./?g=3",
+  "name": "귀가 조사 3학년",
+  "short_name": "귀가 3학년",
+  "lang": "ko",
+  "dir": "ltr",
+  "description": "귀가 방법(대중교통, 부모님 차량)을 조사하고 학년별로 모으는 앱",
+  "start_url": "./?g=3",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#E6ECF4",
+  "theme_color": "#15284B",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

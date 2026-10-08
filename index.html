@@ -7,10 +7,27 @@
    비워 두면 저장되지 않는 미리보기로 열립니다. (Apps Script 안에 Index 로 넣어 쓸 때는 비워 둡니다.) */
 var API_URL = 'https://script.google.com/macros/s/AKfycbymM1nygBXf5hCqlHU2pTbIpaK5Px5DgWuoV6TJcLDexirrw_wgLpTajfESh3XptZcEbQ/exec';
 </script>
+<link rel="manifest" id="app-manifest" href="manifest.json">
+<script>
+/* 주소에 맞는 앱 정보를 고른다: ?v=t 교사용, ?g=1~3 학년별, 없으면 학생 공통 */
+window.RIDE_PWA = true;
+(function () {
+  var q = location.search, m = 'manifest.json', g = /[?&]g=([123])(&|$)/.exec(q);
+  if (/[?&]v=t(&|$)/.test(q)) m = 'manifest-teacher.json'; else if (g) m = 'manifest-g' + g[1] + '.json';
+  document.getElementById('app-manifest').setAttribute('href', m);
+})();
+</script>
+<meta name="theme-color" content="#15284B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="귀가 조사">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>금요일 귀가 조사</title>
+<title>귀가 조사</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
 <style>
@@ -137,6 +154,8 @@ table.form{width:100%;border-collapse:collapse;table-layout:fixed}
 .sum .c-names{text-align:left;line-height:1.8;word-break:keep-all}
 .sum .c-names small{display:block;color:var(--sub);font-size:13px;line-height:1.5}
 .copybox{margin-top:18px}
+.wlist{margin-top:12px}
+.wrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--rule);font-size:15px}
 .copybox h2{font-size:15px;margin:0 0 8px}
 .copybox textarea.field{min-height:120px;font-size:15px;background:var(--soft);resize:none;overflow:hidden}
 .print-title{display:none}
@@ -158,7 +177,7 @@ label.lab{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;font-size:15px;max-width:calc(100% - 32px);z-index:30;box-shadow:0 8px 24px -8px rgba(21,40,75,.6)}
 .toast.bad{background:var(--pencil)}
-footer{text-align:center;margin-top:16px}
+footer{text-align:center;margin-top:16px;display:flex;justify-content:center;gap:16px}
 
 @media (max-width:640px){
   .grid3{grid-template-columns:1fr}
@@ -210,7 +229,7 @@ footer{text-align:center;margin-top:16px}
 <body data-view="__VIEW__" data-url="__APP_URL__" data-grade="__GRADE__">
 <div class="wrap">
   <header class="top">
-    <h1>금요일 귀가 조사</h1>
+    <h1>귀가 조사</h1>
     <span class="role" id="role">학생용</span>
   </header>
   <div class="note" id="demo-note" hidden>미리보기 화면입니다. 여기서 누른 내용은 저장되지 않습니다.</div>
@@ -295,6 +314,7 @@ footer{text-align:center;margin-top:16px}
               <select id="d-select" aria-label="금요일 고르기"></select>
               <button type="button" class="sq" id="d-next" aria-label="다음 금요일">›</button>
               <button type="button" class="btn ghost small" id="d-today">이번 주</button>
+              <button type="button" class="btn ghost small" id="d-change">날짜 바꾸기</button>
             </div>
             <div class="row">
               <button type="button" class="btn ghost small" id="t-refresh">새로고침</button>
@@ -350,6 +370,20 @@ footer{text-align:center;margin-top:16px}
           <p class="hint" id="c-yearhint"></p>
           <label class="check"><input type="checkbox" id="c-open"><span>학생이 QR로 들어와 자기 이름을 직접 등록할 수 있게 하기<br><small style="color:var(--sub)">명단을 직접 입력했다면 꺼 두는 것을 권합니다.</small></span></label>
         </div>
+        <div class="part" id="w-part">
+          <h2>조사 날짜 바꾸기</h2>
+          <p class="hint" style="margin:0 0 12px">평소에는 매주 금요일입니다. 공휴일 등으로 날짜가 바뀌는 주만 골라 바꾸세요. 요일은 자동으로 맞춰집니다.</p>
+          <div class="grid2">
+            <div><label class="lab" for="w-week">바꿀 주</label><select class="field" id="w-week"></select></div>
+            <div><label class="lab" for="w-date">조사할 날</label><input class="field" id="w-date" type="date"></div>
+          </div>
+          <p class="hint" id="w-hint" aria-live="polite"></p>
+          <div class="row" style="margin-top:12px">
+            <button type="button" class="btn" id="w-save">날짜 바꾸기</button>
+            <button type="button" class="btn ghost" id="w-reset" hidden>금요일로 되돌리기</button>
+          </div>
+          <div class="wlist" id="w-list"></div>
+        </div>
         <div class="part">
           <h2>학년별 명단</h2>
           <div class="grid3" id="c-rosters"></div>
@@ -380,7 +414,10 @@ footer{text-align:center;margin-top:16px}
     </div>
   </main>
 
-  <footer><button type="button" class="link" id="switch">교사용 화면</button></footer>
+  <footer>
+    <button type="button" class="link" id="switch">교사용 화면</button>
+    <button type="button" class="link" id="install" hidden>앱으로 설치</button>
+  </footer>
 </div>
 
 <div class="overlay" id="qr-overlay" hidden>
@@ -424,7 +461,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (list.indexOf(f) >= 0) return f;
     return f < list[0] ? list[0] : list[list.length - 1];
   }
-  function fmtLong(key) { var p = partsOf(key); return p.m + '월 ' + p.d + '일 금요일'; }
+  var DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+  function dayOf(key) { var p = partsOf(key); return DAYS[new Date(p.y, p.m - 1, p.d).getDay()]; }
+  /** 그 날이 들어 있는 주(월요일~일요일)의 금요일 */
+  function weekFriday(key) {
+    var p = partsOf(key), d = new Date(p.y, p.m - 1, p.d);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 4);
+    return keyOf(d);
+  }
+  function addDays(key, n) { var p = partsOf(key); return keyOf(new Date(p.y, p.m - 1, p.d + n)); }
+  function fmtLong(key) { var p = partsOf(key); return p.m + '월 ' + p.d + '일 ' + dayOf(key) + '요일'; }
+  function fmtMD(key) { var p = partsOf(key); return p.m + '월 ' + p.d + '일'; }
   function fmtShort(key) { var p = partsOf(key); return p.m + '/' + p.d; }
 
   /* ───────── 서버 호출 (구글 밖에서 열면 미리보기용 가짜 서버) ───────── */
@@ -436,7 +483,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var LIVE = !!GAS || API_OK;
   var demo = (function () {
     var D = {
-      year: new Date().getFullYear(), capacity: 20, open: true, pin: '', resp: {},
+      year: new Date().getFullYear(), capacity: 20, open: true, pin: '', resp: {}, overrides: {},
       rosters: {
         '1학년': ['김하늘', '이서준', '박지우', '최민서', '정예준', '강서연', '조도윤', '윤하은', '장시우', '임지호', '한수아', '오주원', '서은우', '신채원', '권유준', '황다은', '안현우', '송지안'],
         '2학년': ['고은별', '남궁민', '도하린', '류시안', '문가온', '민서율', '배준희', '백도현', '변하람', '성지유', '손예린', '엄태윤', '여민재', '유나경', '육서진', '인하준', '전소율', '차은호', '표지후', '함다온'],
@@ -449,25 +496,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var r = D.resp[f + '|' + g] = {};
       D.rosters[g].slice(0, 11 - gi * 3).forEach(function (n, i) { r[n] = WAYS[i % 3 === 1 ? 1 : 0]; });
     });
+    function copy(o) { var r = {}; Object.keys(o || {}).forEach(function (k) { r[k] = o[k]; }); return r; }
     function st(dk, g) {
-      var r = {}, src = D.resp[dk + '|' + g] || {}, ro = {};
-      Object.keys(src).forEach(function (k) { r[k] = src[k]; });
-      GR.forEach(function (x) { ro[x] = D.rosters[x].slice(); });
-      return { year: D.year, capacity: D.capacity, open: D.open, grades: GR.slice(), rosters: ro, responses: r, date: dk || '', grade: GR.indexOf(g) >= 0 ? g : '', hasPin: !!D.pin };
+      var ro = {}, all = {};
+      GR.forEach(function (x) { ro[x] = D.rosters[x].slice(); all[x] = copy(D.resp[dk + '|' + x]); });
+      var gg = GR.indexOf(g) >= 0 ? g : '';
+      return { year: D.year, capacity: D.capacity, open: D.open, grades: GR.slice(), rosters: ro, overrides: copy(D.overrides),
+        responses: gg ? all[gg] : {}, responsesAll: all, date: dk || '', grade: gg, hasPin: !!D.pin };
     }
     function chk(p) { if (!D.pin) throw new Error('교사 비밀번호를 먼저 만들어 주세요.'); if (String(p) !== D.pin) throw new Error('비밀번호가 맞지 않습니다.'); }
     function bucket(dk, g) { return D.resp[dk + '|' + g] = D.resp[dk + '|' + g] || {}; }
+    function enroll(g, n, byStudent) {
+      if (byStudent && !D.open) throw new Error('지금은 이름 등록을 받지 않습니다. 선생님께 말씀드리세요.');
+      if (D.rosters[g].length >= D.capacity) throw new Error(g + ' 정원 ' + D.capacity + '명이 모두 찼습니다.');
+      D.rosters[g].push(n); D.rosters[g].sort(byName);
+    }
     return {
       getState: st,
-      registerName: function (g, n, dk) {
-        if (D.rosters[g].indexOf(n) < 0) {
-          if (!D.open) throw new Error('지금은 이름 등록을 받지 않습니다. 선생님께 말씀드리세요.');
-          if (D.rosters[g].length >= D.capacity) throw new Error(g + ' 정원 ' + D.capacity + '명이 모두 등록되었습니다. 선생님께 말씀드리세요.');
-          D.rosters[g].push(n); D.rosters[g].sort(byName);
-        }
-        return st(dk, g);
+      registerName: function (g, n, dk) { if (D.rosters[g].indexOf(n) < 0) enroll(g, n, true); return st(dk, g); },
+      submitResponse: function (dk, g, n, m, reg) {
+        if (D.rosters[g].indexOf(n) < 0) { if (reg) enroll(g, n, true); else throw new Error(g + ' 명단에 없는 이름입니다.'); }
+        bucket(dk, g)[n] = m; return st(dk, g);
       },
-      submitResponse: function (dk, g, n, m) { bucket(dk, g)[n] = m; return st(dk, g); },
       checkPin: function (p) { chk(p); return { sheetUrl: '' }; },
       setPin: function (o, n) {
         if (D.pin) chk(o);
@@ -491,20 +541,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       addStudent: function (p, g, n, dk) {
         chk(p);
         if (D.rosters[g].indexOf(n) >= 0) throw new Error(g + '에 이미 같은 이름이 있습니다.');
-        if (D.rosters[g].length >= D.capacity) throw new Error(g + ' 정원 ' + D.capacity + '명이 모두 찼습니다. 설정에서 정원을 늘려 주세요.');
-        D.rosters[g].push(n); D.rosters[g].sort(byName);
+        enroll(g, n, false);
         return st(dk, g);
       },
-      getSummary: function (p, dk) {
+      setWeekDate: function (p, fri, nd, g) {
         chk(p);
-        var total = 0;
-        var grades = GR.map(function (g) {
-          var r = D.resp[dk + '|' + g] || {}, transit = [], answered = 0;
-          D.rosters[g].forEach(function (n) { if (r[n]) answered++; if (r[n] === WAYS[0]) transit.push(n); });
-          total += transit.length;
-          return { grade: g, total: D.rosters[g].length, answered: answered, transit: transit };
-        });
-        return { date: dk, transitTotal: total, grades: grades };
+        if (weekFriday(nd) !== fri) throw new Error('같은 주(월요일~일요일) 안의 날짜만 고를 수 있습니다.');
+        var old = D.overrides[fri] || fri;
+        GR.forEach(function (x) { if (D.resp[old + '|' + x]) { D.resp[nd + '|' + x] = D.resp[old + '|' + x]; if (old !== nd) delete D.resp[old + '|' + x]; } });
+        if (nd === fri) delete D.overrides[fri]; else D.overrides[fri] = nd;
+        return st(nd, g);
       },
       saveSettings: function (p, c, dk, g) {
         chk(p);
@@ -597,39 +643,78 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var HOSTED = !FILLED && !!APP_URL;                                 // GitHub 같은 곳에 올려 연 화면
   var OWN_DEVICE = VIEW !== 'teacher';                               // 학생 주소로 들어온 기기만 이름을 기억한다
   var mode = OWN_DEVICE ? 'student' : 'teacher';
-  var S = { year: new Date().getFullYear(), capacity: 20, open: true, grades: GR, rosters: {}, responses: {}, hasPin: false };
+  var S = { year: new Date().getFullYear(), capacity: 20, open: true, grades: GR, rosters: {}, overrides: {}, all: {}, hasPin: false };
+  // S.all: 고른 날짜의 세 학년 응답 { 학년: { 이름: 귀가 방법 } }. 한 번에 받아 두어 학년을 바꿔도 다시 부르지 않는다.
+  // S.overrides: 그 주 조사 날짜를 바꾼 것 { 원래 금요일: 바뀐 날짜 }
   var date = thisFriday(new Date());
   var grade = URL_GRADE;
   var loaded = false, waiting = false, pin = '', authed = false, sheetUrl = '', pending = 0;   // waiting: 학년, 날짜를 바꾼 뒤 응답을 기다리는 중
   var pick = { way: '' }, justDrawn = '', settingsDirty = false, tab = 'table';
   var edit = null;        // 주간 표에서 고치는 중인 이름: { old: 기존 이름 또는 null(새 학생), value, busy, fresh }
-  var sum = null;         // 대중교통 명단 (선택한 금요일)
+  var wPick = '', wDirty = false;     // 날짜 바꾸기에서 고른 주(금요일)와, 날짜 칸을 손댔는지
+  var CACHE_KEY = 'ride.cache.' + (API || APP_URL || 'here');
 
   function roster() { return S.rosters[grade] || []; }
+  /** 지금 학년의 응답 { 이름: 귀가 방법 } */
+  function R() { return S.all[grade] || (S.all[grade] = {}); }
+  /** 그 주의 조사 날짜: 바꾼 날이 있으면 그 날, 없으면 금요일 */
+  function surveyDate(fri) { return S.overrides[fri] || fri; }
+  function surveyDates(year) { return fridaysOf(year).map(surveyDate); }
+  function todayDate(year) { return surveyDate(defaultFriday(year, new Date())); }
+
+  /** 고른 날짜가 조사 날짜가 아니게 되었으면(연도, 날짜 변경) 같은 주의 조사 날짜나 이번 주로 옮긴다. */
+  function fixDate(yearChanged) {
+    var list = surveyDates(S.year), want = date;
+    if (yearChanged) want = todayDate(S.year);
+    else if (list.indexOf(date) < 0) {
+      var same = surveyDate(weekFriday(date));
+      want = list.indexOf(same) >= 0 ? same : todayDate(S.year);
+    }
+    if (want === date) return false;
+    date = want; S.all = {}; waiting = true;
+    return true;
+  }
   function apply(st) {
     var yearChanged = st.year !== S.year;
     S.year = st.year; S.capacity = st.capacity; S.open = st.open; S.hasPin = st.hasPin;
-    S.grades = st.grades || GR; S.rosters = st.rosters || {};
-    if (st.date === date && st.grade === grade) { S.responses = st.responses; waiting = false; }
-    loaded = true;
-    var list = fridaysOf(S.year);
-    if (list.indexOf(date) < 0 || yearChanged) {
-      var want = defaultFriday(S.year, new Date());
-      if (want !== date) { date = want; S.responses = {}; waiting = true; load(); }
+    S.grades = st.grades || GR; S.rosters = st.rosters || {}; S.overrides = st.overrides || {};
+    if (st.date === date) {
+      if (st.responsesAll) S.all = st.responsesAll;
+      else { S.all = {}; S.all[st.grade] = st.responses || {}; }
+      waiting = false;
     }
+    loaded = true;
+    saveCache();
+    if (fixDate(yearChanged)) load();
     render();
+  }
+  /** 명단, 날짜 설정을 기기에 저장해 두었다가 다음에 열 때 바로 그린다. */
+  function saveCache() {
+    if (!LIVE) return;
+    store('l', CACHE_KEY, JSON.stringify({ year: S.year, capacity: S.capacity, open: S.open, grades: S.grades, rosters: S.rosters, overrides: S.overrides, hasPin: S.hasPin }));
+  }
+  function loadCache() {
+    if (!LIVE) return;
+    var c = null;
+    try { c = JSON.parse(store('l', CACHE_KEY) || 'null'); } catch (e) {}
+    if (!c || !c.rosters || !c.year) return;
+    S.year = c.year; S.capacity = c.capacity; S.open = c.open; S.grades = c.grades || GR;
+    S.rosters = c.rosters; S.overrides = c.overrides || {}; S.hasPin = !!c.hasPin;
+    loaded = true; waiting = true;            // 응답은 새로 받을 때까지 기다린다
+    date = todayDate(S.year);
   }
   /** 성공하면 true, 실패하면 안내를 띄우고 false */
   function load() {
     return call('getState', date, grade).then(function (st) { apply(st); return true; }, function (e) { fail(e); return false; });
   }
+  /** 학년 바꾸기: 세 학년 응답을 이미 받아 두었으므로 서버를 다시 부르지 않는다. */
   function setGrade(g) {
     if (g === grade) return;
-    grade = g; S.responses = {}; justDrawn = ''; waiting = true; edit = null;
+    grade = g; justDrawn = ''; edit = null;
     if (mode === 'student') { $('s-name').value = ''; pick.way = ''; }
     else store('s', 'ride.tgrade', g);
     render();
-    load().then(function () { if (mode === 'student') onName(); });
+    if (mode === 'student') onName();
   }
   function fillSeg(box, onPick) {
     if (box.childNodes.length !== S.grades.length) {
@@ -674,14 +759,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     chips.textContent = '';
     list.forEach(function (n) {
       var kids = [n];
-      if (S.responses[n]) kids.push(el('span', { 'class': 'dot', html: MARK.replace('class="mark"', 'class="mark" style="width:14px;height:14px"') }));
+      if (R()[n]) kids.push(el('span', { 'class': 'dot', html: MARK.replace('class="mark"', 'class="mark" style="width:14px;height:14px"') }));
       chips.appendChild(el('button', {
         type: 'button', 'class': 'chip', 'aria-pressed': n === cur ? 'true' : 'false',
         onclick: function () { $('s-name').value = n; onName(); }
       }, kids));
     });
     var hint = '';
-    if (cur && S.responses[cur]) hint = '이미 ' + WAY_LABEL[S.responses[cur]] + '(으)로 제출했어요. 바꾸려면 다시 제출하세요.';
+    if (cur && R()[cur]) hint = '이미 ' + WAY_LABEL[R()[cur]] + '(으)로 제출했어요. 바꾸려면 다시 제출하세요.';
     else if (cur && list.indexOf(cur) < 0) {
       hint = !S.open ? grade + ' 명단에 없는 이름입니다. 아래에서 이름을 골라 주세요.'
         : list.length >= S.capacity ? '정원이 다 찼습니다. 아래에서 이름을 골라 주세요.'
@@ -694,7 +779,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   function onName() {
     var cur = cleanName($('s-name').value);
-    if (S.responses[cur] && !pick.way) pick.way = S.responses[cur];
+    if (R()[cur] && !pick.way) pick.way = R()[cur];
     renderStudent();
   }
   function submit() {
@@ -705,8 +790,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!pick.way) { toast('집에 가는 방법을 골라 주세요.', true); return; }
     var way = pick.way, g = grade, btn = $('s-submit');
     btn.disabled = true; btn.textContent = '제출하는 중';
-    var first = roster().indexOf(name) < 0 ? call('registerName', g, name, date) : Promise.resolve();
-    first.then(function () { return call('submitResponse', date, g, name, way); })
+    call('submitResponse', date, g, name, way, roster().indexOf(name) < 0)
       .then(function (st) {
         apply(st);
         if (OWN_DEVICE && mode === 'student') { store('l', 'ride.name', name); store('l', 'ride.grade', g); }
@@ -757,11 +841,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (tab === 'settings') renderSettings();
   }
   function fillDates(sel) {
-    var list = fridaysOf(S.year), now = defaultFriday(S.year, new Date());
-    if (sel.getAttribute('data-year') !== String(S.year)) {
+    var list = surveyDates(S.year), now = todayDate(S.year), sig = S.year + JSON.stringify(S.overrides) + now;
+    if (sel.getAttribute('data-sig') !== sig) {
       sel.textContent = '';
       list.forEach(function (k) { sel.appendChild(el('option', { value: k, text: fmtLong(k) + (k === now ? ' (이번 주)' : '') })); });
-      sel.setAttribute('data-year', String(S.year));
+      sel.setAttribute('data-sig', sig);
     }
     sel.value = date;
     return list;
@@ -795,7 +879,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         rows.appendChild(el('tr', { 'class': 'empty' }, kids));
         continue;
       }
-      var way = S.responses[name] || '';
+      var way = R()[name] || '';
       if (way === WAYS[0]) a++; else if (way === WAYS[1]) b++; else left.push(name);
       var cells = [el('td', { 'class': 'c-no', text: String(r + 1) })];
       var editingHere = edit && edit.old === name;
@@ -856,23 +940,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     edit.busy = true;
     var job = old ? call('renameStudent', pin, grade, old, v, date) : call('addStudent', pin, grade, v, date);
     job.then(function (st) {
-      edit = null; sum = null;
+      edit = null;
       settingsDirty = false;      // 설정 화면의 명단도 새 명단으로 다시 채운다
       apply(st);
       toast(old ? '이름을 고쳤습니다. 지난 기록도 함께 바뀌었습니다.' : v + ' 학생을 추가했습니다.');
     }).catch(function (e) { if (edit) edit.busy = false; fail(e); });
   }
 
-  /* 대중교통 명단 */
-  function loadSummary() {
-    var d = date;
-    return call('getSummary', pin, d).then(function (r) {
-      if (r.date === date) { sum = r; if (tab === 'sum') renderSummary(); }
-      return true;
-    }, function (e) { fail(e); return false; });
+  /* 대중교통 명단: 받아 둔 세 학년 응답으로 바로 계산한다 */
+  function loadSummary() { return load(); }
+  function localSummary() {
+    var total = 0;
+    var grades = S.grades.map(function (g) {
+      var r = S.all[g] || {}, list = S.rosters[g] || [], transit = [], answered = 0;
+      list.forEach(function (n) { if (r[n]) answered++; if (r[n] === WAYS[0]) transit.push(n); });
+      total += transit.length;
+      return { grade: g, total: list.length, answered: answered, transit: transit };
+    });
+    return { date: date, transitTotal: total, grades: grades };
   }
-  function summaryText() {
-    var p = partsOf(date), lines = ['[금요일 귀가 조사] ' + p.m + '월 ' + p.d + '일(금) 대중교통'], missing = [];
+  function summaryText(sum) {
+    var p = partsOf(date), lines = ['[귀가 조사] ' + p.m + '월 ' + p.d + '일(' + dayOf(date) + ') 대중교통'], missing = [];
     sum.grades.forEach(function (g) {
       lines.push(g.grade + ' ' + g.transit.length + '명' + (g.transit.length ? ': ' + g.transit.join(', ') : ''));
       if (g.total > g.answered) missing.push(g.grade + ' ' + (g.total - g.answered) + '명');
@@ -886,7 +974,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $('m-print-title').textContent = S.year + '년 ' + fmtLong(date) + ' 대중교통 귀가 명단';
     var rows = $('m-rows'), st = $('m-status');
     rows.textContent = ''; st.textContent = '';
-    var ready = sum && sum.date === date;
+    var sum = waiting ? null : localSummary(), ready = !!sum;
     $('m-copy').disabled = !ready;
     if (!ready) {
       st.textContent = '명단을 불러오는 중';
@@ -906,7 +994,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (people && !missing) line.appendChild(el('span', { 'class': 'all', text: '모두 응답했습니다' }));
     st.appendChild(line);
     var area = $('m-text');
-    area.value = summaryText();
+    area.value = summaryText(sum);
     area.style.height = 'auto';                           // 글 길이에 맞춰 상자 높이를 늘린다
     area.style.height = (area.scrollHeight + 4) + 'px';
   }
@@ -938,24 +1026,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return el('td', null, [btn]);
   }
   function toggleMark(name, way) {
-    var before = S.responses[name] || '', next = before === way ? '' : way, at = date, ag = grade;
-    if (next) S.responses[name] = next; else delete S.responses[name];
+    var before = R()[name] || '', next = before === way ? '' : way, at = date, ag = grade;
+    if (next) R()[name] = next; else delete R()[name];
     justDrawn = next ? name + '|' + next : '';
     renderTable();
     pending++;
     call('teacherMark', pin, at, ag, name, next)
-      .then(function (st) { pending--; sum = null; if (!pending) apply(st); })
+      .then(function (st) { pending--; if (!pending) apply(st); })
       .catch(function (e) {
         pending--;
-        if (at === date && ag === grade) { if (before) S.responses[name] = before; else delete S.responses[name]; renderTable(); }
+        if (at === date && ag === grade) { if (before) R()[name] = before; else delete R()[name]; renderTable(); }
         fail(e);
       });
   }
   function goDate(k) {
     if (!k || k === date) return;
-    date = k; S.responses = {}; waiting = true; edit = null; sum = null;
+    date = k; S.all = {}; waiting = true; edit = null;
     renderTable();
-    if (tab === 'sum') { renderSummary(); loadSummary(); }
+    if (tab === 'sum') renderSummary();
     load();
   }
 
@@ -984,6 +1072,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       S.grades.forEach(function (g, i) { $('c-names-' + i).value = (S.rosters[g] || []).join('\n'); });
     }
     countNames();
+    renderWeek();
     var y = parseInt($('c-year').value, 10);
     if (y >= 2000 && y <= 2100) {
       var f = fridaysOf(y);
@@ -997,6 +1086,56 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     link.hidden = !sheetUrl;
     if (sheetUrl) link.href = sheetUrl;
   }
+  /* 조사 날짜 바꾸기 */
+  function renderWeek() {
+    var sel = $('w-week'), fr = fridaysOf(S.year), now = defaultFriday(S.year, new Date());
+    var sig = S.year + JSON.stringify(S.overrides) + now;
+    if (sel.getAttribute('data-sig') !== sig) {
+      sel.textContent = '';
+      fr.forEach(function (f) {
+        var o = S.overrides[f];
+        sel.appendChild(el('option', { value: f, text: fmtMD(addDays(f, -4)) + '(월) ~ ' + fmtMD(addDays(f, 2)) + '(일)' + (f === now ? ' 이번 주' : '') + (o ? ', ' + fmtLong(o) + '로 바뀜' : '') }));
+      });
+      sel.setAttribute('data-sig', sig);
+    }
+    if (!wPick || fr.indexOf(wPick) < 0) wPick = weekFriday(date);
+    if (fr.indexOf(wPick) < 0) wPick = now;
+    sel.value = wPick;
+    var inp = $('w-date');
+    inp.min = addDays(wPick, -4); inp.max = addDays(wPick, 2);
+    if (!wDirty) inp.value = surveyDate(wPick);
+    $('w-reset').hidden = !S.overrides[wPick];
+    var box = $('w-list');
+    box.textContent = '';
+    Object.keys(S.overrides).sort().forEach(function (f) {
+      if (f.slice(0, 4) !== String(S.year)) return;
+      box.appendChild(el('div', { 'class': 'wrow' }, [
+        el('span', { text: fmtLong(f) + ' → ' + fmtLong(S.overrides[f]) }),
+        el('button', { type: 'button', 'class': 'btn ghost small', text: '되돌리기', onclick: function () { changeWeek(f, f); } })
+      ]));
+    });
+    weekHint();
+  }
+  function weekHint() {
+    var v = $('w-date').value, cur = surveyDate(wPick), msg, ok = false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) msg = '날짜를 골라 주세요.';
+    else if (weekFriday(v) !== wPick) msg = '같은 주(' + fmtMD(addDays(wPick, -4)) + ' 월요일 ~ ' + fmtMD(addDays(wPick, 2)) + ' 일요일) 안의 날짜를 골라 주세요.';
+    else if (v === cur) msg = '지금 이 주의 조사 날짜는 ' + fmtLong(cur) + '입니다.';
+    else { msg = fmtLong(v) + '로 바뀝니다. 이 주에 이미 받은 응답도 함께 옮겨집니다.'; ok = true; }
+    $('w-hint').textContent = msg;
+    $('w-hint').style.color = (!ok && v !== cur) ? 'var(--pencil)' : '';
+    $('w-save').disabled = !ok;
+  }
+  function changeWeek(fri, nd) {
+    $('w-save').disabled = true;
+    call('setWeekDate', pin, fri, nd, grade).then(function (st) {
+      if (weekFriday(date) === fri) date = nd;
+      wDirty = false;
+      apply(st);
+      toast(fmtLong(nd) + (nd === fri ? '로 되돌렸습니다.' : '로 바꿨습니다.'));
+    }, function (e) { fail(e); weekHint(); });
+  }
+
   function namesFromBox(i) {
     var out = [];
     $('c-names-' + i).value.split(/[\n,]+/).forEach(function (raw) {
@@ -1024,7 +1163,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var btn = $('c-save');
     btn.disabled = true;
     call('saveSettings', pin, cfg, date, grade)
-      .then(function (st) { settingsDirty = false; sum = null; $('d-select').removeAttribute('data-year'); $('m-select').removeAttribute('data-year'); apply(st); toast('설정을 저장했습니다. 명단을 가나다순으로 정리했습니다.'); })
+      .then(function (st) { settingsDirty = false; $('d-select').removeAttribute('data-sig'); $('m-select').removeAttribute('data-sig'); apply(st); toast('설정을 저장했습니다. 명단을 가나다순으로 정리했습니다.'); })
       .catch(fail)
       .then(function () { btn.disabled = false; });
   }
@@ -1084,16 +1223,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   $('gate-go').addEventListener('click', enter);
   $('gate-pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') enter(); });
   $('tab-table').addEventListener('click', function () { tab = 'table'; render(); });
-  $('tab-sum').addEventListener('click', function () { tab = 'sum'; edit = null; render(); loadSummary(); });
+  $('tab-sum').addEventListener('click', function () { tab = 'sum'; edit = null; render(); });
   $('tab-settings').addEventListener('click', function () { tab = 'settings'; edit = null; render(); });
   $('m-select').addEventListener('change', function () { goDate(this.value); });
   $('m-refresh').addEventListener('click', function () { loadSummary().then(function (ok) { if (ok) toast('새로 불러왔습니다.'); }); });
   $('m-print').addEventListener('click', function () { window.print(); });
   $('m-copy').addEventListener('click', copySummary);
   $('d-select').addEventListener('change', function () { goDate(this.value); });
-  $('d-prev').addEventListener('click', function () { var l = fridaysOf(S.year); goDate(l[l.indexOf(date) - 1]); });
-  $('d-next').addEventListener('click', function () { var l = fridaysOf(S.year); goDate(l[l.indexOf(date) + 1]); });
-  $('d-today').addEventListener('click', function () { goDate(defaultFriday(S.year, new Date())); });
+  $('d-prev').addEventListener('click', function () { var l = surveyDates(S.year); goDate(l[l.indexOf(date) - 1]); });
+  $('d-next').addEventListener('click', function () { var l = surveyDates(S.year); goDate(l[l.indexOf(date) + 1]); });
+  $('d-today').addEventListener('click', function () { goDate(todayDate(S.year)); });
+  $('d-change').addEventListener('click', function () {
+    tab = 'settings'; edit = null; wPick = weekFriday(date); wDirty = false;
+    render();
+    $('w-part').scrollIntoView({ block: 'start' });
+  });
   $('t-refresh').addEventListener('click', function () { load().then(function (ok) { if (ok) toast('새로 불러왔습니다.'); }); });
   $('t-print').addEventListener('click', function () { window.print(); });
 
@@ -1102,6 +1246,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   });
   $('c-open').addEventListener('change', function () { settingsDirty = true; });
   $('c-save').addEventListener('click', saveSettings);
+  $('w-week').addEventListener('change', function () { wPick = this.value; wDirty = false; renderWeek(); });
+  $('w-date').addEventListener('input', function () { wDirty = true; weekHint(); });
+  $('w-date').addEventListener('change', function () { wDirty = true; weekHint(); });
+  $('w-save').addEventListener('click', function () { changeWeek(wPick, $('w-date').value); });
+  $('w-reset').addEventListener('click', function () { changeWeek(wPick, wPick); });
   $('p-save').addEventListener('click', function () {
     var v = $('p-new').value.trim();
     call('setPin', pin, v).then(function () { pin = v; store('s', 'ride.pin', v); $('p-new').value = ''; toast('비밀번호를 바꿨습니다.'); }).catch(fail);
@@ -1120,9 +1269,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   // 교사 화면을 열어 둔 동안 15초마다 새 응답을 불러온다
   setInterval(function () {
     if (mode !== 'teacher' || !authed || pending || edit || document.visibilityState !== 'visible') return;
-    if (tab === 'table') call('getState', date, grade).then(function (st) { if (!pending && !edit) apply(st); }).catch(function () {});
-    else if (tab === 'sum') call('getSummary', pin, date).then(function (r) { if (r.date === date && tab === 'sum') { sum = r; renderSummary(); } }).catch(function () {});
+    if (tab === 'table' || tab === 'sum') call('getState', date, grade).then(function (st) { if (!pending && !edit) apply(st); }).catch(function () {});
   }, 15000);
+
+  /* ───────── 설치형 웹앱 (GitHub 버전에만 들어 있다) ───────── */
+  if (window.RIDE_PWA && HOSTED) {
+    var installEvt = null;
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    }
+    // 안드로이드, PC의 Chrome, 엣지: 브라우저가 설치할 수 있다고 알려 주면 버튼을 보인다
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; $('install').hidden = standalone; });
+    window.addEventListener('appinstalled', function () { installEvt = null; $('install').hidden = true; toast('설치했습니다. 홈 화면이나 앱 목록에서 열 수 있습니다.'); });
+    // 아이폰, 아이패드: 설치 창이 없으므로 방법을 알려 준다
+    if (isIOS && !standalone) $('install').hidden = false;
+    $('install').addEventListener('click', function () {
+      if (installEvt) {
+        installEvt.prompt();
+        installEvt.userChoice.then(function () { installEvt = null; });
+      } else if (isIOS) {
+        toast('Safari 아래쪽(아이패드는 위쪽) 공유 버튼을 누르고 "홈 화면에 추가"를 고르세요.');
+      }
+    });
+  }
 
   /* ───────── 시작 ───────── */
   if (mode === 'teacher') teacherGrade();
@@ -1131,16 +1302,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!grade && GR.indexOf(savedGrade) >= 0) grade = savedGrade;
     if (grade && grade === savedGrade) $('s-name').value = store('l', 'ride.name');
   }
+  loadCache();
   render();
-  load().then(function () {
-    if (mode === 'student') onName();
-    var saved = store('s', 'ride.pin');
-    if (saved && S.hasPin) {
-      call('checkPin', saved).then(function (info) {
-        pin = saved; authed = true; sheetUrl = (info && info.sheetUrl) || ''; render();
-      }).catch(function () { store('s', 'ride.pin', ''); });
-    }
-  });
+  if (mode === 'student' && loaded) onName();
+  var savedPin = store('s', 'ride.pin');
+  if (savedPin) {
+    call('checkPin', savedPin).then(function (info) {
+      pin = savedPin; authed = true; S.hasPin = true; sheetUrl = (info && info.sheetUrl) || ''; render();
+    }).catch(function () { store('s', 'ride.pin', ''); });
+  }
+  load().then(function () { if (mode === 'student') onName(); });
 })();
 </script>
 </body>
