@@ -154,6 +154,15 @@ table.form{width:100%;border-collapse:collapse;table-layout:fixed}
 .sum .c-names{text-align:left;line-height:1.8;word-break:keep-all}
 .sum .c-names small{display:block;color:var(--sub);font-size:13px;line-height:1.5}
 .copybox{margin-top:18px}
+/* 부모님 차량 특이사항 */
+.memo-box{margin-top:14px}
+.memo-box .lab{font-size:14px;color:var(--ink);font-weight:700}
+.memo-box .lab span{color:var(--sub);font-weight:400}
+.memo-note{display:block;width:100%;border:0;background:transparent;font-size:12px;line-height:1.35;color:var(--ink);padding:0 4px 7px;text-align:center;word-break:keep-all;cursor:text}
+.memo-note:hover{text-decoration:underline}
+.memo-note.add{color:var(--sub);opacity:.8}
+.sub-h{font-size:15px;margin:22px 0 8px}
+.sum .c-who{width:96px;font-weight:700;text-align:left}
 .wlist{margin-top:12px}
 .wrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--rule);font-size:15px}
 .copybox h2{font-size:15px;margin:0 0 8px}
@@ -205,7 +214,7 @@ footer{text-align:center;margin-top:16px;display:flex;justify-content:center;gap
   .form th,.form td{height:30px;border-color:#666}
   .form thead th,.form thead th.c-no,.form thead th.c-date{background:#fff;color:#000}
   .cell,.nm{height:30px}.mark{width:22px;height:22px}
-  .nm.add{visibility:hidden}
+  .nm.add,.memo-note.add{visibility:hidden}
   .form.sum td{height:auto;padding:8px 10px}
   .mark path{stroke:#000}
   .form .c-date{display:table-cell}
@@ -266,6 +275,10 @@ footer{text-align:center;margin-top:16px;display:flex;justify-content:center;gap
               <svg class="ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M52 4C82 3 97 22 96 50S80 97 49 96 3 78 4 49 20 5 58 6"/></svg>
             </button>
           </div>
+          <div class="memo-box" id="s-memo-box" hidden>
+            <label class="lab" for="s-memo">특이사항 <span>(적지 않아도 돼요)</span></label>
+            <input class="field" id="s-memo" type="text" maxlength="40" autocomplete="off" placeholder="예: 부모님 3시에 오심, OO이랑 카풀">
+          </div>
         </div>
         <div class="part">
           <button type="button" class="btn wide" id="s-submit">제출하기</button>
@@ -278,6 +291,7 @@ footer{text-align:center;margin-top:16px;display:flex;justify-content:center;gap
       </div>
       <p class="who" id="s-done-who"></p>
       <p id="s-done-day"></p>
+      <p id="s-done-memo" hidden></p>
       <div class="row center">
         <button type="button" class="btn ghost" id="s-edit">고치기</button>
         <button type="button" class="btn ghost" id="s-next">다른 사람 입력</button>
@@ -352,6 +366,12 @@ footer{text-align:center;margin-top:16px;display:flex;justify-content:center;gap
             <tbody id="m-rows"></tbody>
             <tfoot><tr><td class="c-grade">합계</td><td class="c-count" id="m-total"></td><td class="c-names" id="m-note"></td></tr></tfoot>
           </table>
+          <h2 class="sub-h">부모님 차량 특이사항</h2>
+          <table class="form sum" id="m-notes-table">
+            <thead><tr><th class="c-grade">학년</th><th class="c-who">이름</th><th>특이사항</th></tr></thead>
+            <tbody id="m-notes"></tbody>
+          </table>
+          <p class="hint" id="m-notes-empty" hidden>적힌 특이사항이 없습니다.</p>
           <div class="copybox">
             <h2><label for="m-text">카톡에 붙여넣을 글</label></h2>
             <textarea class="field" id="m-text" readonly></textarea>
@@ -483,7 +503,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var LIVE = !!GAS || API_OK;
   var demo = (function () {
     var D = {
-      year: new Date().getFullYear(), capacity: 20, open: true, pin: '', resp: {}, overrides: {},
+      year: new Date().getFullYear(), capacity: 20, open: true, pin: '', resp: {}, memo: {}, overrides: {},
       rosters: {
         '1학년': ['김하늘', '이서준', '박지우', '최민서', '정예준', '강서연', '조도윤', '윤하은', '장시우', '임지호', '한수아', '오주원', '서은우', '신채원', '권유준', '황다은', '안현우', '송지안'],
         '2학년': ['고은별', '남궁민', '도하린', '류시안', '문가온', '민서율', '배준희', '백도현', '변하람', '성지유', '손예린', '엄태윤', '여민재', '유나경', '육서진', '인하준', '전소율', '차은호', '표지후', '함다온'],
@@ -498,14 +518,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     function copy(o) { var r = {}; Object.keys(o || {}).forEach(function (k) { r[k] = o[k]; }); return r; }
     function st(dk, g) {
-      var ro = {}, all = {};
-      GR.forEach(function (x) { ro[x] = D.rosters[x].slice(); all[x] = copy(D.resp[dk + '|' + x]); });
+      var ro = {}, all = {}, memos = {};
+      GR.forEach(function (x) { ro[x] = D.rosters[x].slice(); all[x] = copy(D.resp[dk + '|' + x]); memos[x] = copy(D.memo[dk + '|' + x]); });
       var gg = GR.indexOf(g) >= 0 ? g : '';
       return { year: D.year, capacity: D.capacity, open: D.open, grades: GR.slice(), rosters: ro, overrides: copy(D.overrides),
-        responses: gg ? all[gg] : {}, responsesAll: all, date: dk || '', grade: gg, hasPin: !!D.pin };
+        responses: gg ? all[gg] : {}, responsesAll: all, memosAll: memos, date: dk || '', grade: gg, hasPin: !!D.pin };
     }
     function chk(p) { if (!D.pin) throw new Error('교사 비밀번호를 먼저 만들어 주세요.'); if (String(p) !== D.pin) throw new Error('비밀번호가 맞지 않습니다.'); }
     function bucket(dk, g) { return D.resp[dk + '|' + g] = D.resp[dk + '|' + g] || {}; }
+    function memos(dk, g) { return D.memo[dk + '|' + g] = D.memo[dk + '|' + g] || {}; }
     function enroll(g, n, byStudent) {
       if (byStudent && !D.open) throw new Error('지금은 이름 등록을 받지 않습니다. 선생님께 말씀드리세요.');
       if (D.rosters[g].length >= D.capacity) throw new Error(g + ' 정원 ' + D.capacity + '명이 모두 찼습니다.');
@@ -514,9 +535,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return {
       getState: st,
       registerName: function (g, n, dk) { if (D.rosters[g].indexOf(n) < 0) enroll(g, n, true); return st(dk, g); },
-      submitResponse: function (dk, g, n, m, reg) {
+      submitResponse: function (dk, g, n, m, reg, memo) {
         if (D.rosters[g].indexOf(n) < 0) { if (reg) enroll(g, n, true); else throw new Error(g + ' 명단에 없는 이름입니다.'); }
-        bucket(dk, g)[n] = m; return st(dk, g);
+        bucket(dk, g)[n] = m;
+        if (m === WAYS[1] && memo) memos(dk, g)[n] = String(memo).slice(0, 40); else delete memos(dk, g)[n];
+        return st(dk, g);
+      },
+      teacherMemo: function (p, dk, g, n, memo) {
+        chk(p);
+        if (bucket(dk, g)[n] !== WAYS[1]) throw new Error('부모님 차량으로 표시한 학생만 특이사항을 적을 수 있습니다.');
+        if (memo) memos(dk, g)[n] = memo; else delete memos(dk, g)[n];
+        return st(dk, g);
       },
       checkPin: function (p) { chk(p); return { sheetUrl: '' }; },
       setPin: function (o, n) {
@@ -524,7 +553,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!/^\d{4,8}$/.test(String(n))) throw new Error('비밀번호는 숫자 4~8자리로 정해 주세요.');
         D.pin = String(n); return true;
       },
-      teacherMark: function (p, dk, g, n, m) { chk(p); if (m) bucket(dk, g)[n] = m; else delete bucket(dk, g)[n]; return st(dk, g); },
+      teacherMark: function (p, dk, g, n, m) { chk(p); if (m) bucket(dk, g)[n] = m; else delete bucket(dk, g)[n]; delete memos(dk, g)[n]; return st(dk, g); },
       renameStudent: function (p, g, old, nw, dk) {
         chk(p);
         var at = D.rosters[g].indexOf(old);
@@ -532,8 +561,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (nw !== old) {
           if (D.rosters[g].indexOf(nw) >= 0) throw new Error(g + '에 이미 같은 이름이 있습니다.');
           D.rosters[g][at] = nw; D.rosters[g].sort(byName);
-          Object.keys(D.resp).forEach(function (k) {
-            if (k.split('|')[1] === g && D.resp[k][old]) { D.resp[k][nw] = D.resp[k][old]; delete D.resp[k][old]; }
+          [D.resp, D.memo].forEach(function (box) {
+            Object.keys(box).forEach(function (k) {
+              if (k.split('|')[1] === g && box[k][old]) { box[k][nw] = box[k][old]; delete box[k][old]; }
+            });
           });
         }
         return st(dk, g);
@@ -548,7 +579,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         chk(p);
         if (weekFriday(nd) !== fri) throw new Error('같은 주(월요일~일요일) 안의 날짜만 고를 수 있습니다.');
         var old = D.overrides[fri] || fri;
-        GR.forEach(function (x) { if (D.resp[old + '|' + x]) { D.resp[nd + '|' + x] = D.resp[old + '|' + x]; if (old !== nd) delete D.resp[old + '|' + x]; } });
+        GR.forEach(function (x) {
+          [D.resp, D.memo].forEach(function (box) { if (box[old + '|' + x]) { box[nd + '|' + x] = box[old + '|' + x]; if (old !== nd) delete box[old + '|' + x]; } });
+        });
         if (nd === fri) delete D.overrides[fri]; else D.overrides[fri] = nd;
         return st(nd, g);
       },
@@ -643,7 +676,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var HOSTED = !FILLED && !!APP_URL;                                 // GitHub 같은 곳에 올려 연 화면
   var OWN_DEVICE = VIEW !== 'teacher';                               // 학생 주소로 들어온 기기만 이름을 기억한다
   var mode = OWN_DEVICE ? 'student' : 'teacher';
-  var S = { year: new Date().getFullYear(), capacity: 20, open: true, grades: GR, rosters: {}, overrides: {}, all: {}, hasPin: false };
+  var S = { year: new Date().getFullYear(), capacity: 20, open: true, grades: GR, rosters: {}, overrides: {}, all: {}, memos: {}, hasPin: false };
+  // S.memos: 고른 날짜의 부모님 차량 특이사항 { 학년: { 이름: 특이사항 } }
   // S.all: 고른 날짜의 세 학년 응답 { 학년: { 이름: 귀가 방법 } }. 한 번에 받아 두어 학년을 바꿔도 다시 부르지 않는다.
   // S.overrides: 그 주 조사 날짜를 바꾼 것 { 원래 금요일: 바뀐 날짜 }
   var date = thisFriday(new Date());
@@ -657,6 +691,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function roster() { return S.rosters[grade] || []; }
   /** 지금 학년의 응답 { 이름: 귀가 방법 } */
   function R() { return S.all[grade] || (S.all[grade] = {}); }
+  /** 지금 학년의 특이사항 { 이름: 특이사항 } */
+  function M() { return S.memos[grade] || (S.memos[grade] = {}); }
   /** 그 주의 조사 날짜: 바꾼 날이 있으면 그 날, 없으면 금요일 */
   function surveyDate(fri) { return S.overrides[fri] || fri; }
   function surveyDates(year) { return fridaysOf(year).map(surveyDate); }
@@ -671,7 +707,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       want = list.indexOf(same) >= 0 ? same : todayDate(S.year);
     }
     if (want === date) return false;
-    date = want; S.all = {}; waiting = true;
+    date = want; S.all = {}; S.memos = {}; waiting = true;
     return true;
   }
   function apply(st) {
@@ -681,6 +717,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (st.date === date) {
       if (st.responsesAll) S.all = st.responsesAll;
       else { S.all = {}; S.all[st.grade] = st.responses || {}; }
+      S.memos = st.memosAll || {};
       waiting = false;
     }
     loaded = true;
@@ -711,7 +748,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function setGrade(g) {
     if (g === grade) return;
     grade = g; justDrawn = ''; edit = null;
-    if (mode === 'student') { $('s-name').value = ''; pick.way = ''; }
+    if (mode === 'student') { $('s-name').value = ''; $('s-memo').value = ''; pick.way = ''; }
     else store('s', 'ride.tgrade', g);
     render();
     if (mode === 'student') onName();
@@ -776,10 +813,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     Array.prototype.forEach.call(document.querySelectorAll('.way'), function (b) {
       b.setAttribute('aria-pressed', b.getAttribute('data-way') === pick.way ? 'true' : 'false');
     });
+    $('s-memo-box').hidden = pick.way !== WAYS[1];
   }
   function onName() {
     var cur = cleanName($('s-name').value);
     if (R()[cur] && !pick.way) pick.way = R()[cur];
+    if (R()[cur] === WAYS[1] && M()[cur] && !$('s-memo').value) $('s-memo').value = M()[cur];   // 지난번에 적은 특이사항
     renderStudent();
   }
   function submit() {
@@ -789,14 +828,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!NAME_RE.test(name)) { toast('이름은 한글이나 영문으로 20자 이내로 적어 주세요.', true); return; }
     if (!pick.way) { toast('집에 가는 방법을 골라 주세요.', true); return; }
     var way = pick.way, g = grade, btn = $('s-submit');
+    var memo = way === WAYS[1] ? $('s-memo').value.replace(/\s+/g, ' ').trim() : '';
     btn.disabled = true; btn.textContent = '제출하는 중';
-    call('submitResponse', date, g, name, way, roster().indexOf(name) < 0)
+    call('submitResponse', date, g, name, way, roster().indexOf(name) < 0, memo)
       .then(function (st) {
         apply(st);
         if (OWN_DEVICE && mode === 'student') { store('l', 'ride.name', name); store('l', 'ride.grade', g); }
         $('s-done-way').textContent = WAY_LABEL[way];
         $('s-done-who').textContent = g + ' ' + name;
         $('s-done-day').textContent = fmtLong(date) + ' 귀가 방법을 제출했습니다.';
+        var saved = (S.memos[g] || {})[name] || '';
+        $('s-done-memo').textContent = saved ? '특이사항: ' + saved : '';
+        $('s-done-memo').hidden = !saved;
         $('toast').hidden = true;
         $('s-form').hidden = true; $('s-done').hidden = false;
         drawRing($('s-done').querySelector('.ring'));
@@ -813,7 +856,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     ring.classList.add('draw');
   }
   function backToForm(clear) {
-    if (clear) { $('s-name').value = ''; pick.way = ''; }
+    if (clear) { $('s-name').value = ''; $('s-memo').value = ''; pick.way = ''; }
     $('s-done').hidden = true; $('s-form').hidden = false;
     renderStudent();
     if (clear) $('s-name').focus();
@@ -883,6 +926,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (way === WAYS[0]) a++; else if (way === WAYS[1]) b++; else left.push(name);
       var cells = [el('td', { 'class': 'c-no', text: String(r + 1) })];
       var editingHere = edit && edit.old === name;
+      var memoHere = edit && edit.kind === 'memo' && edit.name === name;
+      if (memoHere) {
+        cells.push(el('td', { 'class': 'c-name' }, [nameButton(name)]));
+        cells.push(memoEditorCell());
+        rows.appendChild(el('tr', null, cells));
+        continue;
+      }
       if (editingHere) cells.push(editorCell(narrow));
       else {
         cells.push(el('td', { 'class': 'c-name' }, [nameButton(name)]));
@@ -952,10 +1002,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function localSummary() {
     var total = 0;
     var grades = S.grades.map(function (g) {
-      var r = S.all[g] || {}, list = S.rosters[g] || [], transit = [], answered = 0;
-      list.forEach(function (n) { if (r[n]) answered++; if (r[n] === WAYS[0]) transit.push(n); });
+      var r = S.all[g] || {}, mm = S.memos[g] || {}, list = S.rosters[g] || [], transit = [], notes = [], answered = 0;
+      list.forEach(function (n) {
+        if (r[n]) answered++;
+        if (r[n] === WAYS[0]) transit.push(n);
+        if (r[n] === WAYS[1] && mm[n]) notes.push({ name: n, memo: mm[n] });
+      });
       total += transit.length;
-      return { grade: g, total: list.length, answered: answered, transit: transit };
+      return { grade: g, total: list.length, answered: answered, transit: transit, notes: notes };
     });
     return { date: date, transitTotal: total, grades: grades };
   }
@@ -966,6 +1020,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (g.total > g.answered) missing.push(g.grade + ' ' + (g.total - g.answered) + '명');
     });
     lines.push('합계 ' + sum.transitTotal + '명');
+    var notes = [];
+    sum.grades.forEach(function (g) { g.notes.forEach(function (x) { notes.push(g.grade + ' ' + x.name + '(' + x.memo + ')'); }); });
+    if (notes.length) lines.push('특이사항: ' + notes.join(', '));
     if (missing.length) lines.push('미응답: ' + missing.join(', '));
     return lines.join('\n');
   }
@@ -975,6 +1032,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var rows = $('m-rows'), st = $('m-status');
     rows.textContent = ''; st.textContent = '';
     var sum = waiting ? null : localSummary(), ready = !!sum;
+    var nb = $('m-notes'), count = 0;
+    nb.textContent = '';
+    if (sum) sum.grades.forEach(function (g) {
+      g.notes.forEach(function (x) {
+        count++;
+        nb.appendChild(el('tr', null, [el('td', { 'class': 'c-grade', text: g.grade }), el('td', { 'class': 'c-who', text: x.name }), el('td', { 'class': 'c-names', text: x.memo })]));
+      });
+    });
+    $('m-notes-table').hidden = !count;
+    $('m-notes-empty').hidden = !sum || !!count;
     $('m-copy').disabled = !ready;
     if (!ready) {
       st.textContent = '명단을 불러오는 중';
@@ -1023,11 +1090,47 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     btn.disabled = waiting;
     if (on && justDrawn === name + '|' + way) btn.firstChild.classList.add('draw');
-    return el('td', null, [btn]);
+    var kids = [btn];
+    if (on && way === WAYS[1] && !waiting) {
+      var memo = M()[name] || '';
+      kids.push(el('button', {
+        type: 'button', 'class': 'memo-note' + (memo ? '' : ' add'), text: memo || '+ 특이사항',
+        'aria-label': name + ' 특이사항 ' + (memo ? '고치기' : '적기'),
+        onclick: function () { edit = { kind: 'memo', name: name, value: memo, busy: false, fresh: true }; renderTable(); }
+      }));
+    }
+    return el('td', null, kids);
+  }
+  /** 날짜, 동그라미 칸 자리를 합쳐 특이사항 입력 칸을 넣는다. */
+  function memoEditorCell() {
+    var input = el('input', { 'class': 'memo-in', type: 'text', maxlength: '40', autocomplete: 'off', placeholder: '예: 부모님 3시에 오심, OO이랑 카풀', 'aria-label': edit.name + ' 특이사항' });
+    input.value = edit.value;
+    input.addEventListener('input', function () { if (edit) edit.value = input.value; });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveMemo(); }
+      else if (e.key === 'Escape') { e.stopPropagation(); cancelEdit(); }
+    });
+    editInput = input;
+    return el('td', { 'class': 'editing', colspan: '3' }, [el('div', { 'class': 'edit' }, [
+      input,
+      el('button', { type: 'button', 'class': 'btn small memo-ok', text: '저장', onclick: saveMemo }),
+      el('button', { type: 'button', 'class': 'btn ghost small memo-no', text: '취소', onclick: cancelEdit })
+    ])]);
+  }
+  function saveMemo() {
+    if (!edit || edit.kind !== 'memo' || edit.busy) return;
+    var name = edit.name, text = String(edit.value || '').replace(/\s+/g, ' ').trim();
+    edit.busy = true;
+    call('teacherMemo', pin, date, grade, name, text).then(function (st) {
+      edit = null;
+      apply(st);
+      toast(text ? '특이사항을 저장했습니다.' : '특이사항을 지웠습니다.');
+    }).catch(function (e) { if (edit) edit.busy = false; fail(e); });
   }
   function toggleMark(name, way) {
     var before = R()[name] || '', next = before === way ? '' : way, at = date, ag = grade;
     if (next) R()[name] = next; else delete R()[name];
+    delete M()[name];                       // 칸을 바꾸면 특이사항은 지워진다
     justDrawn = next ? name + '|' + next : '';
     renderTable();
     pending++;
@@ -1041,7 +1144,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   function goDate(k) {
     if (!k || k === date) return;
-    date = k; S.all = {}; waiting = true; edit = null;
+    date = k; S.all = {}; S.memos = {}; waiting = true; edit = null;
     renderTable();
     if (tab === 'sum') renderSummary();
     load();

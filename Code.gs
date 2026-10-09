@@ -63,7 +63,7 @@ function api_() {
     getState: getState, registerName: registerName, submitResponse: submitResponse,
     checkPin: checkPin, setPin: setPin, teacherMark: teacherMark, saveSettings: saveSettings,
     renameStudent: renameStudent, addStudent: addStudent, getSummary: getSummary,
-    setWeekDate: setWeekDate
+    setWeekDate: setWeekDate, teacherMemo: teacherMemo
   };
 }
 
@@ -99,8 +99,11 @@ function registerName(grade, rawName, dateKey) {
   });
 }
 
-/** register 가 true 이면 명단에 없는 이름을 먼저 등록한다 (요청 한 번으로 끝낸다). */
-function submitResponse(dateKey, grade, rawName, method, register) {
+/**
+ * register 가 true 이면 명단에 없는 이름을 먼저 등록한다 (요청 한 번으로 끝낸다).
+ * memo 는 부모님 차량일 때만 남기는 특이사항 (적지 않아도 된다).
+ */
+function submitResponse(dateKey, grade, rawName, method, register, memo) {
   fresh_();
   return locked_(function () {
     if (METHODS.indexOf(method) < 0) throw new Error('귀가 방법을 골라 주세요.');
@@ -109,7 +112,7 @@ function submitResponse(dateKey, grade, rawName, method, register) {
       var name = cleanName_(rawName);
       if (readRosters_()[grade].indexOf(name) < 0) enroll_(grade, name, true);
     }
-    return mark_(dateKey, grade, rawName, method, '학생');
+    return mark_(dateKey, grade, rawName, method, '학생', memo);
   });
 }
 
@@ -138,7 +141,29 @@ function teacherMark(pin, dateKey, grade, rawName, method) {
   checkPin_(pin);
   return locked_(function () {
     if (method !== '' && METHODS.indexOf(method) < 0) throw new Error('귀가 방법을 골라 주세요.');
-    return mark_(dateKey, grade, rawName, method, '교사');
+    return mark_(dateKey, grade, rawName, method, '교사', '');
+  });
+}
+
+/** 교사가 부모님 차량 학생의 특이사항을 적거나 고친다 (빈칸이면 지운다). */
+function teacherMemo(pin, dateKey, grade, rawName, memo) {
+  fresh_();
+  checkPin_(pin);
+  return locked_(function () {
+    checkGrade_(grade);
+    var cfg = readConfig_();
+    checkSurveyDate_(dateKey, cfg);
+    var name = cleanName_(rawName), text = cleanMemo_(memo), found = null;
+    readResponses_().some(function (r) {
+      if (r.date === dateKey && r.grade === grade && r.name === name) { found = r; return true; }
+      return false;
+    });
+    if (!found || found.method !== METHODS[1]) throw new Error('부모님 차량으로 표시한 학생만 특이사항을 적을 수 있습니다.');
+    var sh = sheet_(SH.RESP);
+    sh.getRange(found.row, 7).setNumberFormat('@').setValue(text);
+    sh.getRange(1, 7).setValue('특이사항');
+    found.memo = text;
+    return state_(dateKey, grade);
   });
 }
 
@@ -219,18 +244,19 @@ function getSummary(pin, dateKey) {
   if (!isDate_(dateKey)) throw new Error('날짜를 확인해 주세요.');
   var rosters = readRosters_(), by = {};
   readResponses_().forEach(function (r) {
-    if (r.date === dateKey && r.method) by[r.grade + '|' + r.name] = r.method;
+    if (r.date === dateKey && r.method) by[r.grade + '|' + r.name] = r;
   });
   var total = 0;
   var grades = GRADES.map(function (g) {
-    var transit = [], answered = 0;
+    var transit = [], notes = [], answered = 0;
     rosters[g].forEach(function (n) {
-      var m = by[g + '|' + n];
+      var r = by[g + '|' + n], m = r && r.method;
       if (m) answered++;
       if (m === METHODS[0]) transit.push(n);
+      if (m === METHODS[1] && r.memo) notes.push({ name: n, memo: r.memo });
     });
     total += transit.length;
-    return { grade: g, total: rosters[g].length, answered: answered, transit: transit };
+    return { grade: g, total: rosters[g].length, answered: answered, transit: transit, notes: notes };
   });
   return { date: dateKey, transitTotal: total, grades: grades };
 }
@@ -270,11 +296,13 @@ function setWeekDate(pin, friday, newDate, grade) {
 function state_(dateKey, grade) {
   var cfg = readConfig_();
   var g = GRADES.indexOf(grade) >= 0 ? grade : '';
-  var all = {};
-  GRADES.forEach(function (x) { all[x] = {}; });
+  var all = {}, memos = {};
+  GRADES.forEach(function (x) { all[x] = {}; memos[x] = {}; });
   if (isDate_(dateKey)) {
     readResponses_().forEach(function (r) {
-      if (r.date === dateKey && r.method && all[r.grade]) all[r.grade][r.name] = r.method;
+      if (r.date !== dateKey || !r.method || !all[r.grade]) return;
+      all[r.grade][r.name] = r.method;
+      if (r.memo && r.method === METHODS[1]) memos[r.grade][r.name] = r.memo;
     });
   }
   var overrides = {};
@@ -282,18 +310,19 @@ function state_(dateKey, grade) {
   return {
     year: cfg.year, capacity: cfg.capacity, open: cfg.open,
     grades: GRADES, rosters: readRosters_(), overrides: overrides,
-    responses: g ? all[g] : {}, responsesAll: all,
+    responses: g ? all[g] : {}, responsesAll: all, memosAll: memos,
     date: dateKey || '', grade: g, hasPin: !!getPin_()
   };
 }
 
-function mark_(dateKey, grade, rawName, method, by) {
+function mark_(dateKey, grade, rawName, method, by, memo) {
   checkGrade_(grade);
   var cfg = readConfig_();
   checkSurveyDate_(dateKey, cfg);
   var name = cleanName_(rawName);
+  var text = method === METHODS[1] ? cleanMemo_(memo) : '';     // 특이사항은 부모님 차량일 때만
   if (readRosters_()[grade].indexOf(name) < 0) throw new Error(grade + ' 명단에 없는 이름입니다.');
-  upsertResponse_(dateKey, grade, name, method, by);
+  upsertResponse_(dateKey, grade, name, method, by, text);
   markCumulative_(cfg.year, grade, dateKey, name, method);
   return state_(dateKey, grade);
 }
@@ -323,6 +352,13 @@ function checkSurveyDate_(dateKey, cfg) {
 
 function checkGrade_(grade) {
   if (GRADES.indexOf(grade) < 0) throw new Error('학년을 골라 주세요.');
+}
+
+/** 특이사항: 빈칸 정리, 수식으로 읽히지 않게 앞 기호 떼기, 40자까지 */
+function cleanMemo_(raw) {
+  var text = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim().replace(/^[=+\-@\s]+/, '');
+  if (text.length > 40) throw new Error('특이사항은 40자 이내로 적어 주세요.');
+  return text;
 }
 
 function cleanName_(raw) {
@@ -424,7 +460,8 @@ function sheet_(name) {
     sh.setFrozenRows(1);
   } else if (name === SH.RESP) {
     sh.getRange(1, 2, sh.getMaxRows(), 3).setNumberFormat('@');   // 날짜, 학년, 이름은 글자 그대로
-    sh.getRange(1, 1, 1, 6).setValues([['기록 시각', '날짜', '학년', '이름', '귀가 방법', '입력']]).setFontWeight('bold');
+    sh.getRange(1, 7, sh.getMaxRows(), 1).setNumberFormat('@');   // 특이사항
+    sh.getRange(1, 1, 1, 7).setValues([['기록 시각', '날짜', '학년', '이름', '귀가 방법', '입력', '특이사항']]).setFontWeight('bold');
     sh.setFrozenRows(1);
   }
   return sh;
@@ -510,13 +547,13 @@ function readResponses_() {
   var sh = sheet_(SH.RESP);
   var last = sh.getLastRow();
   if (last < 2) return (m.resp = []);
-  return (m.resp = sh.getRange(2, 1, last - 1, 6).getValues().map(function (v, i) {
-    return { row: i + 2, date: dateKey_(v[1]), grade: String(v[2]).trim(), name: String(v[3]).trim(), method: String(v[4]).trim() };
+  return (m.resp = sh.getRange(2, 1, last - 1, 7).getValues().map(function (v, i) {
+    return { row: i + 2, date: dateKey_(v[1]), grade: String(v[2]).trim(), name: String(v[3]).trim(), method: String(v[4]).trim(), memo: String(v[6] == null ? '' : v[6]).trim() };
   }));
 }
 
 /** 같은 날짜, 학년, 이름이 있으면 그 행을 고치고, 없으면 새 행을 붙인다. method 가 비면 지운다. */
-function upsertResponse_(dateKey, grade, name, method, by) {
+function upsertResponse_(dateKey, grade, name, method, by, memo) {
   var sh = sheet_(SH.RESP);
   var list = readResponses_(), found = null;
   list.some(function (r) {
@@ -527,14 +564,17 @@ function upsertResponse_(dateKey, grade, name, method, by) {
     if (found) { sh.deleteRow(found.row); memo_().resp = null; }
     return;
   }
-  var row = [new Date(), dateKey, grade, name, method, by];
+  memo = memo || '';
+  var row = [new Date(), dateKey, grade, name, method, by, memo];
+  if (memo) sh.getRange(1, 7).setValue('특이사항');              // 예전 버전에서 만든 탭에도 제목을 붙인다
   if (found) {
     sh.getRange(found.row, 2, 1, 3).setNumberFormat('@');
-    sh.getRange(found.row, 1, 1, 6).setValues([row]);
-    found.method = method;
+    sh.getRange(found.row, 7).setNumberFormat('@');
+    sh.getRange(found.row, 1, 1, 7).setValues([row]);
+    found.method = method; found.memo = memo;
   } else {
     sh.appendRow(row);
-    list.push({ row: -1, date: dateKey, grade: grade, name: name, method: method });   // 행 번호는 이번 실행에서 다시 쓰지 않는다
+    list.push({ row: -1, date: dateKey, grade: grade, name: name, method: method, memo: memo });   // 행 번호는 이번 실행에서 다시 쓰지 않는다
   }
 }
 
